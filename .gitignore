@@ -1,0 +1,14 @@
+# Python 后端忽略文件
+backend/venv/
+backend/.venv/
+backend/__pycache__/
+backend/*.pyc
+backend/*.pyo
+backend/*.db
+backend/.env
+
+# Node 前端忽略文件
+frontend/node_modules/
+frontend/dist/
+frontend/.DS_Store
+.DS_Store
