@@ -51,7 +51,7 @@
             </div>
             <div class="dash-desc-box">
               <div class="desc-title">🤖 AI 舆情研判中</div>
-              <div class="desc-text">已连接 36氪、微博、百度实时数据源，每 5 分钟自动更新。</div>
+              <div class="desc-text">已连接 头条号、微博、百度实时数据源，每 5 分钟自动更新。</div>
             </div>
           </div>
 
