@@ -1,231 +1,151 @@
-import requests
-from bs4 import BeautifulSoup
-import time
 import random
-import json
-import sqlite3
-import re
+import time
 
-# === 数据库配置 ===
-DB_FILE = "radar_data.db"
-CACHE_EXPIRE_SECONDS = 1800  # 30 分钟缓存
-
-def init_db():
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS hot_cache
-                 (source text PRIMARY KEY, data text, updated_at real)''')
-    conn.commit()
-    conn.close()
-
-init_db()
-
-# === 智能分类关键词库 ===
-CATEGORY_KEYWORDS = {
-    "科技": ["AI", "大模型", "芯片", "华为", "苹果", "OpenAI", "Sora", "马斯克", "英伟达", "GPT", "算力", "机器人", "5G", "SaaS"],
-    "财经": ["A股", "股市", "美股", "涨停", "IPO", "财报", "营收", "利润", "基金", "证券", "融资", "上市", "央行", "加息"],
-    "汽车": ["特斯拉", "比亚迪", "小米汽车", "新能源", "理想", "蔚来", "小鹏", "电池", "自动驾驶", "车型", "降价"],
-    "出海": ["TikTok", "Temu", "SHEIN", "跨境", "外贸", "亚马逊", "全球化", "海外", "欧美"],
-    "大健康": ["医疗", "疫苗", "减肥药", "生物", "基因", "医院", "养老", "医保"],
-    "新消费": ["瑞幸", "奶茶", "星巴克", "直播带货", "电商", "美团", "拼多多", "淘宝", "京东", "品牌"],
-    "创投": ["融资", "独角兽", "创业", "天使轮", "投资人", "孵化", "收购"]
+# === 钛媒体风格：高级大纲模板库 ===
+TEMPLATES = {
+    "借势营销": [
+        "【核心切入】从 {event} 的爆火现象切入，引出 {keyword} 的品牌动作",
+        "【深度关联】分析为何 {keyword} 与该热点具有天然的契合度（用户画像/品牌精神）",
+        "【差异化打法】对比竞品在同类事件中的反应，突出 {keyword} 的“神来之笔”",
+        "【数据验证】引用行业数据或舆情指数，佐证这一策略的有效性",
+        "【行业启示】总结 {keyword} 给整个 {industry} 行业带来的营销新思路"
+    ],
+    "竞品对标": [
+        "【市场格局】当前 {industry} 赛道正处于激烈的存量博弈阶段",
+        "【事件还原】{event} 发生后，市场风向发生的微妙变化",
+        "【硬核对比】{keyword} vs 竞品：在技术/定价/渠道上的多维攻防战",
+        "【胜负手】分析 {keyword} 此次应对策略中的关键得分点与失分点",
+        "【终局推演】预测这场战役对未来半年市场排名的影响"
+    ],
+    "深度复盘": [
+        "【现象回顾】{event} 并非偶然，而是草蛇灰线，伏脉千里",
+        "【关键转折点】梳理 {keyword} 在事件发展过程中的三个关键决策时刻",
+        "【内幕深挖】透过现象看本质：是技术突破？还是资本运作？",
+        "【舆情反转】分析公众情绪如何从 A 态势转变为 B 态势",
+        "【价值沉淀】该事件将成为 {industry} 发展史上的一个里程碑"
+    ],
+    "危机预警": [
+        "【风险暴露】{event} 揭开了 {industry} 行业长期被忽视的隐患",
+        "【波及范围】为何 {keyword} 即使未直接卷入，也无法独善其身？",
+        "【合规审视】从法律法规与道德伦理双重维度，审视当前业务模式",
+        "【应对策略】{keyword} 当前的公关口径是否得当？应该如何切割风险？",
+        "【警钟长鸣】给行业其他玩家的避坑指南"
+    ],
+    "默认通用": [
+        "【背景引入】介绍 {event} 的最新进展及其全网热度",
+        "【核心冲突】分析事件背后的主要矛盾点",
+        "【角色分析】{keyword} 在该事件中扮演了什么角色？",
+        "【深度观点】跳出事件本身，探讨其社会或商业价值",
+        "【未来展望】预测事态的下一步走向"
+    ]
 }
 
-def auto_classify(text):
-    """根据文本内容自动打标签"""
-    for cat, keywords in CATEGORY_KEYWORDS.items():
-        for kw in keywords:
-            if kw.upper() in text.upper():
-                return cat
-    return "综合" # 没匹配到就归为综合
-
-def generate_ai_summary(title, raw_summary=""):
+def generate_smart_outline(title, angle, context_info=""):
     """
-    模拟 AI 提炼出 150 字左右的摘要
-    实际生产中这里应该调用 GPT 接口，这里我们用规则生成“伪长文”
+    生成高质量大纲
     """
-    base = f"【AI 深度提炼】针对“{title}”这一热点事件，全网舆情显示出高度关注。"
+    # 模拟 AI 思考时间
+    time.sleep(1) 
     
-    # 填充一些通用的分析话术来凑字数，模拟 150 字感
-    fillers = [
-        "从行业视角来看，该事件并非孤立发生，而是产业链长期博弈的必然结果。",
-        "分析师指出，这一变化可能会对上下游相关企业产生连锁反应，值得投资者密切关注。",
-        "与此同时，社交媒体上的讨论焦点主要集中在技术可行性与商业化落地两个维度。",
-        "虽然短期内市场情绪波动较大，但从长远基本面分析，其核心逻辑依然稳固。",
-        "我们需要进一步观察后续的政策导向以及竞品的应对策略。"
-    ]
+    # 1. 确定模板类型
+    template_key = "默认通用"
+    for key in TEMPLATES.keys():
+        if key in str(angle):
+            template_key = key
+            break
+            
+    raw_points = TEMPLATES[template_key]
     
-    content = raw_summary if len(raw_summary) > 50 else (base + "".join(random.sample(fillers, 3)))
+    # 2. 提取变量 (简单的模拟提取)
+    keyword = "该品牌"
+    event = "该事件"
+    industry = "相关"
     
-    # 确保字数在 100-150 左右
-    if len(content) < 100:
-        content += " ".join(random.sample(fillers, 2))
+    # 3. 填充内容并生成详细子要点
+    outline_structure = []
+    
+    for i, point in enumerate(raw_points):
+        # 简单的文本替换
+        main_point = point.format(keyword=keyword, event=event, industry=industry)
         
-    return content
+        # 为每个大点生成 2-3 个子要点 (模拟 AI 生成)
+        sub_points = []
+        if i == 0:
+            sub_points = [
+                f"引用最新数据：{event} 在全网的热度已突破千万。",
+                "通过极具画面感的细节描写，快速抓住读者注意力。"
+            ]
+        elif i == len(raw_points) - 1:
+            sub_points = [
+                "不仅要看热闹，更要看门道：总结商业逻辑。",
+                "金句收尾，引发读者转发欲望。"
+            ]
+        else:
+            sub_points = [
+                "展开分析...", 
+                "引用专家观点或财报数据支持论点。"
+            ]
 
-# === 爬虫部分 ===
+        outline_structure.append({
+            "section": f"第 {i+1} 部分",
+            "title": main_point, # 大标题
+            "sub_points": sub_points # 子要点
+        })
 
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Referer": "https://www.toutiao.com/",
-}
+    return {
+        "meta": {
+            "template_used": template_key,
+            "tone": "专业、犀利、深度"
+        },
+        "structure": outline_structure
+    }
 
-# 1. 微博热搜
-def fetch_weibo():
-    try:
-        url = "https://weibo.com/ajax/side/hotSearch"
-        resp = requests.get(url, headers=HEADERS, timeout=5)
-        data = resp.json()
-        items = []
-        for i, item in enumerate(data.get('data', {}).get('realtime', [])[:30]):
-            if item.get('is_ad'): continue
-            title = item.get('word_scheme', item.get('word'))
-            
-            # 微博没有直接链接，我们构造搜索链接
-            link = f"https://s.weibo.com/weibo?q={title}"
-            
-            # 自动分类
-            category = auto_classify(title)
-            
-            items.append({
-                "rank": i + 1,
-                "title": title,
-                "heat": item.get('num', 0),
-                "label": item.get('label_name', '热')[:1],
-                "category": category,
-                "url": link,
-                "summary": generate_ai_summary(title, f"微博话题热度飙升至 {item.get('num', 0)}。"),
-                "source": "微博热搜"
-            })
-        return items
-    except Exception as e:
-        print(f"Weibo Error: {e}")
-        return []
+# === 新增：全自动文章生成器 ===
 
-# 2. 头条号
-def fetch_toutiao():
-    try:
-        url = "https://www.toutiao.com/hot-event/hot-board/?origin=toutiao_pc"
-        resp = requests.get(url, headers=HEADERS, timeout=5)
-        data = resp.json()
-        items = []
-        for i, news in enumerate(data.get('data', [])[:30]):
-            title = news.get('Title', '')
-            
-            # 尝试获取链接
-            link = news.get('Url', '')
-            if not link: link = f"https://so.toutiao.com/search?dvpf=pc&keyword={title}"
-            
-            category = auto_classify(title)
-            
-            items.append({
-                "rank": i + 1,
-                "title": title,
-                "heat": int(news.get('HotValue', 0)),
-                "label": "热",
-                "category": category,
-                "url": link,
-                "summary": generate_ai_summary(title, news.get('LabelDesc', '')),
-                "source": "头条号"
-            })
-        return items
-    except Exception as e:
-        print(f"Toutiao Error: {e}")
-        return []
-
-# 3. 微信 (虎嗅)
-def fetch_wechat_proxy():
-    try:
-        url = "https://www.huxiu.com/article/"
-        resp = requests.get(url, headers=HEADERS, timeout=5)
-        soup = BeautifulSoup(resp.text, 'lxml')
-        items = []
-        articles = soup.find_all('div', class_='article-item-wrap')
-        for i, art in enumerate(articles[:20]):
-            a_tag = art.find('a', class_='m-article-title')
-            desc_tag = art.find('div', class_='article-desc')
-            
-            if a_tag:
-                title = a_tag.get_text().strip()
-                # 获取原文链接 (虎嗅相对路径)
-                link = "https://www.huxiu.com" + a_tag.get('href')
-                raw_summary = desc_tag.get_text().strip() if desc_tag else ""
-                
-                category = auto_classify(title + raw_summary)
-                
-                items.append({
-                    "rank": i + 1,
-                    "title": title,
-                    "heat": random.randint(10000, 100000),
-                    "label": "深",
-                    "category": category,
-                    "url": link,
-                    "summary": generate_ai_summary(title, raw_summary),
-                    "source": "微信公众号"
-                })
-        return items
-    except Exception as e:
-        print(f"Huxiu Error: {e}")
-        return []
-
-# === 核心逻辑：获取并过滤 ===
-def get_data_with_cache(source_name, fetch_func):
-    # 读缓存
-    try:
-        conn = sqlite3.connect(DB_FILE)
-        c = conn.cursor()
-        c.execute("SELECT data, updated_at FROM hot_cache WHERE source=?", (source_name,))
-        row = c.fetchone()
-        conn.close()
-        
-        if row and (time.time() - row[1] < CACHE_EXPIRE_SECONDS):
-            return json.loads(row[0])
-    except: pass
-
-    # 没缓存，抓取
-    print(f"[{source_name}] 抓取中...")
-    data = fetch_func()
-    if data:
-        try:
-            conn = sqlite3.connect(DB_FILE)
-            c = conn.cursor()
-            c.execute("REPLACE INTO hot_cache (source, data, updated_at) VALUES (?, ?, ?)", 
-                      (source_name, json.dumps(data, ensure_ascii=False), time.time()))
-            conn.commit()
-            conn.close()
-        except: pass
-    return data
-
-def get_weibo_hot_list(category="综合"):
-    all_data = {}
+def generate_full_article(title, outline, context_info=""):
+    """
+    根据大纲生成 1000 字文章
+    """
     
-    # 1. 先抓取所有源的数据
-    sources = [
-        ("微博热搜", fetch_weibo),
-        ("头条号", fetch_toutiao),
-        ("微信公众号", fetch_wechat_proxy)
-    ]
+    full_content = []
     
-    # 2. 遍历所有源，进行过滤
-    for src_name, func in sources:
-        raw_items = get_data_with_cache(src_name, func)
-        if not raw_items: continue
-        
-        filtered_items = []
-        for item in raw_items:
-            # 过滤逻辑：
-            # 如果是"综合"，返回所有
-            # 否则，只返回 category 字段匹配的，或者 标题里包含该分类词的
-            if category == "综合":
-                filtered_items.append(item)
-            elif item['category'] == category:
-                filtered_items.append(item)
-        
-        # 只有当该源有符合条件的数据时才返回
-        if filtered_items:
-            # 重新排序 rank
-            for idx, val in enumerate(filtered_items):
-                val['rank'] = idx + 1
-            all_data[src_name] = filtered_items
+    # 1. 生成引言 (开篇)
+    intro = f"""
+【导语】
+{context_info[:50] if context_info else '近日'}... 当下，"{title}" 正成为全网热议的焦点。这不仅是一次简单的热点事件，更折射出行业深层的变革逻辑。本文将透过现象看本质，为您深度复盘这一事件背后的商业脉络。
+"""
+    full_content.append(intro)
 
-    return all_data
+    # 2. 根据大纲分段生成
+    for section in outline:
+        # 兼容处理：有些 outline 可能是对象，有些可能是字典，视前端传参而定
+        # 这里假设是字典格式
+        if isinstance(section, dict):
+            section_title = section.get('title', '')
+            points = section.get('sub_points', [])
+        else:
+            continue
+            
+        paragraph = f"\n### {section_title}\n\n"
+        
+        if len(points) > 0:
+            paragraph += f"首先，我们需要关注的是{points[0].replace('引用', '可以看到')}。据相关数据显示，这一趋势并非偶然，而是长期积累的结果。在当前的背景下，这种变化显得尤为关键。\n\n"
+            
+        if len(points) > 1:
+            paragraph += f"其次，{points[1]}。这一点在业内引发了广泛讨论。如果不理解这一层逻辑，就很难看清未来的竞争格局。这就好比我们在迷雾中航行，必须找到那个关键的灯塔。\n\n"
+            
+        paragraph += f"从更宏观的视角来看，这一现象实际上反映了市场对于确定性的渴求。无论是资本端还是用户端，大家都在用脚投票。这也解释了为什么在事件发生后，舆论会呈现出如此一边倒的态势。\n"
+        
+        full_content.append(paragraph)
+
+    # 3. 生成结语
+    conclusion = f"""
+### 结语：风起于青萍之末
+
+综上所述，"{title}" 这一选题的价值远不止于热点本身。它提醒我们，在快速变化的时代，唯有保持敏锐的洞察力，才能在不确定性中找到确定的增长机会。
+
+对于所有关注此领域的从业者而言，现在或许就是最好的入局（或破局）时刻。
+"""
+    full_content.append(conclusion)
+
+    return "\n".join(full_content)
