@@ -7,6 +7,7 @@ from typing import List
 from radar_weibo import get_weibo_hot_list
 from radar_prediction import generate_predictions
 from radar_ai import generate_smart_outline, generate_full_article
+from radar_monitor import process_monitor_data, get_monitor_stats, get_config_keywords, add_config_keyword
 
 app = FastAPI()
 
@@ -36,6 +37,13 @@ class ArticleRequest(BaseModel):
     outline: List[dict]
     context: str = ""
 
+# 定义关键词添加的请求体
+class MonitorKeywordRequest(BaseModel):
+    word: str
+    type: int # 1核心, 2竞品, 3行业
+    category: str # 品牌/产品/高管...
+    sensitive: str = "" # 逗号分隔的敏感词
+
 # --- 接口定义 ---
 
 @app.get("/")
@@ -44,13 +52,21 @@ def read_root():
 
 @app.get("/hotlist")
 def read_hotlist(category: str = "综合"):
-    # 获取爬虫数据
-    data = get_weibo_hot_list(category)
+    # 1. 获取原始爬虫数据
+    raw_data_dict = get_weibo_hot_list(category)
+    
+    # 2. 将字典转为列表，用于监控分析
+    all_items = []
+    for source, items in raw_data_dict.items():
+        all_items.extend(items)
+    
+    # 3. 【核心步骤】送入监控漏斗进行清洗和分析
+    monitor_result = process_monitor_data(all_items)
     
     return {
         "current_keywords": GLOBAL_KEYWORDS,
-        "data": data,
-        "alerts": [] 
+        "data": raw_data_dict,
+        "alerts": monitor_result['alerts'] # 返回新生成的实时告警
     }
 
 # 核心：热点预测接口 (POST)
@@ -100,3 +116,17 @@ def create_article(req: ArticleRequest):
         "status": "success",
         "data": content
     }
+
+# --- 新增：舆情看板接口 ---
+@app.get("/monitor/dashboard")
+def read_monitor_dashboard():
+    return get_monitor_stats()
+
+@app.get("/monitor/config")
+def read_monitor_config():
+    return get_config_keywords()
+
+@app.post("/monitor/config/add")
+def create_monitor_keyword(req: MonitorKeywordRequest):
+    add_config_keyword(req.word, req.type, req.category, req.sensitive)
+    return {"status": "success"}
