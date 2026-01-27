@@ -119,7 +119,6 @@ def generate_full_article(title, outline, context_info=""):
     # 2. 根据大纲分段生成
     for section in outline:
         # 兼容处理：有些 outline 可能是对象，有些可能是字典，视前端传参而定
-        # 这里假设是字典格式
         if isinstance(section, dict):
             section_title = section.get('title', '')
             points = section.get('sub_points', [])
