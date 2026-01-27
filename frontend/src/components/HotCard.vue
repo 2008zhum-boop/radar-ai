@@ -1,28 +1,31 @@
 <template>
-  <div class="hot-card">
+  <div class="hot-card" @click="openLink">
     <div class="card-header">
       <div class="rank-badge" :class="rankClass">{{ rank }}</div>
-      <div class="title-content">
-        <div class="title-row">
-          <span class="title-text">{{ title }}</span>
-          <span v-if="label" class="tag" :class="labelClass">{{ label }}</span>
-        </div>
-        <div class="heat-info">🔥 {{ (heat / 10000).toFixed(1) }}万热度</div>
+      <h3 class="card-title">{{ title }}</h3>
+      <span v-if="label" class="hot-label">{{ label }}</span>
+    </div>
+
+    <div class="card-meta">
+      <span class="heat-value">🔥 {{ formattedHeat }}热度</span>
+      <span v-if="category" class="category-tag"># {{ category }}</span>
+    </div>
+
+    <div class="ai-summary-box">
+      <div class="summary-header">
+        <span class="ai-icon">✨ AI 提炼</span>
       </div>
-    </div>
-
-    <div class="ai-summary" v-if="summary">
-      <div class="ai-label">✨ AI 提炼</div>
       <p class="summary-text">{{ summary }}</p>
-    </div>
-
-    <div class="action-bar">
-      <button class="action-btn analyze-btn" @click="$emit('analyze')">
-        <span class="icon">🤖</span> 深度分析
-      </button>
-      <button class="action-btn write-btn">
-        <span class="icon">⚡️</span> 极速成稿
-      </button>
+      
+      <div class="action-row">
+        <button class="action-btn analyze" @click.stop="$emit('analyze')">
+          <span class="btn-icon">📊</span> 深度分析
+        </button>
+        <button class="action-btn write" @click.stop="$emit('analyze')">
+          <span class="btn-icon">⚡</span> 极速成稿
+        </button>
+        <span class="click-hint">点击查看原文 ↗</span>
+      </div>
     </div>
   </div>
 </template>
@@ -33,9 +36,11 @@ import { computed } from 'vue'
 const props = defineProps({
   rank: Number,
   title: String,
-  heat: Number,
+  heat: [Number, String],
   label: String,
-  summary: String // <--- 接收 summary 参数
+  summary: String,
+  category: String, // 新增接收分类
+  url: String       // 新增接收链接
 })
 
 defineEmits(['analyze'])
@@ -47,12 +52,18 @@ const rankClass = computed(() => {
   return 'rank-other'
 })
 
-const labelClass = computed(() => {
-  if (props.label === '爆') return 'tag-bao'
-  if (props.label === '新') return 'tag-xin'
-  if (props.label === '热') return 'tag-re'
-  return ''
+const formattedHeat = computed(() => {
+  const num = Number(props.heat)
+  if (isNaN(num)) return props.heat
+  return num > 10000 ? (num / 10000).toFixed(1) + '万' : num
 })
+
+// 跳转原文
+const openLink = () => {
+  if (props.url) {
+    window.open(props.url, '_blank')
+  }
+}
 </script>
 
 <style scoped>
@@ -60,102 +71,157 @@ const labelClass = computed(() => {
   background: white;
   border-radius: 12px;
   padding: 16px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-  border: 1px solid #f1f5f9;
-  transition: all 0.2s;
+  border: 1px solid #e2e8f0;
+  transition: all 0.2s ease;
+  cursor: pointer; /* 鼠标变手型 */
   display: flex;
   flex-direction: column;
   gap: 12px;
-  /* 稍微增加高度适应内容 */
-  height: auto; 
-  min-height: 180px; 
+  position: relative;
 }
 
 .hot-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 16px rgba(0,0,0,0.08);
-  border-color: #e2e8f0;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.06);
+  border-color: #cbd5e1;
 }
 
-/* 头部布局 */
 .card-header {
   display: flex;
-  gap: 12px;
   align-items: flex-start;
+  gap: 10px;
 }
 
 .rank-badge {
   flex-shrink: 0;
-  width: 24px; height: 24px;
-  display: flex; align-items: center; justify-content: center;
-  border-radius: 6px; font-weight: 800; font-size: 14px;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-family: 'DIN Alternate', sans-serif;
 }
 .rank-1 { background: #fee2e2; color: #dc2626; }
 .rank-2 { background: #ffedd5; color: #ea580c; }
 .rank-3 { background: #fef9c3; color: #ca8a04; }
-.rank-other { background: #f1f5f9; color: #64748b; font-weight: 600; }
 
-.title-content { flex: 1; overflow: hidden; }
-.title-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; flex-wrap: wrap; }
-.title-text { font-size: 15px; font-weight: 600; color: #1e293b; line-height: 1.4; }
+.card-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #1e293b;
+  line-height: 1.5;
+  flex: 1;
+}
 
-.heat-info { font-size: 11px; color: #94a3b8; font-weight: 500; }
+.hot-label {
+  flex-shrink: 0;
+  background: #fff7ed;
+  color: #ea580c;
+  border: 1px solid #ffedd5;
+  font-size: 10px;
+  padding: 1px 4px;
+  border-radius: 4px;
+}
 
-.tag { font-size: 10px; padding: 1px 4px; border-radius: 3px; color: white; transform: scale(0.9); font-weight: bold; }
-.tag-bao { background: #ef4444; }
-.tag-xin { background: #3b82f6; }
-.tag-re { background: #f59e0b; }
+.card-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+}
 
-/* === 新增：AI 摘要样式 === */
-.ai-summary {
+.heat-value { color: #f59e0b; font-weight: 600; }
+
+.category-tag {
+  color: #3b82f6;
+  background: #eff6ff;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+/* AI 摘要区域 (核心修改) */
+.ai-summary-box {
   background: #f8fafc;
   border-radius: 8px;
-  padding: 10px;
-  border: 1px solid #e2e8f0;
-  position: relative;
-}
-.ai-label {
-  font-size: 10px;
-  color: #2563eb;
-  font-weight: bold;
-  margin-bottom: 4px;
-  display: flex; align-items: center;
-}
-.summary-text {
-  font-size: 12px;
-  color: #475569;
-  line-height: 1.6;
-  margin: 0;
-  display: -webkit-box;
-  -webkit-line-clamp: 3; /* 最多显示3行 */
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  padding: 12px;
+  border: 1px solid #f1f5f9;
 }
 
-/* 底部按钮 */
-.action-bar {
-  margin-top: auto; /* 自动推到底部 */
+.summary-header {
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+}
+
+.ai-icon {
+  font-size: 11px;
+  color: #2563eb;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.summary-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.8; /* 增加行高，更易阅读 */
+  color: #475569;
+  text-align: justify;
+  /* 移除 line-clamp，显示全文 */
+}
+
+/* 底部操作栏 */
+.action-row {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed #e2e8f0;
   display: flex;
   gap: 8px;
+  align-items: center;
 }
 
 .action-btn {
-  flex: 1;
   border: none;
   border-radius: 6px;
-  padding: 6px;
+  padding: 6px 12px;
   font-size: 12px;
+  font-weight: 600;
   cursor: pointer;
-  display: flex; align-items: center; justify-content: center; gap: 4px;
-  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
   transition: all 0.2s;
 }
 
-.analyze-btn { background: #eff6ff; color: #2563eb; }
-.analyze-btn:hover { background: #dbeafe; }
+.action-btn.analyze {
+  background: #eff6ff;
+  color: #2563eb;
+}
+.action-btn.analyze:hover { background: #dbeafe; }
 
-.write-btn { background: #f0fdf4; color: #16a34a; }
-.write-btn:hover { background: #dcfce7; }
+.action-btn.write {
+  background: #f0fdf4;
+  color: #16a34a;
+}
+.action-btn.write:hover { background: #dcfce7; }
+
+.click-hint {
+  margin-left: auto;
+  font-size: 11px;
+  color: #94a3b8;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.hot-card:hover .click-hint {
+  opacity: 1;
+}
 </style>

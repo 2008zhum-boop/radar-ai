@@ -150,7 +150,7 @@
                 <span class="source-icon">📌</span><h3>{{ sourceName }}</h3><span class="top-count">Top {{ items.length }}</span>
               </div>
               <div class="cards-wrapper">
-                <HotCard 
+<HotCard 
                   v-for="item in items" 
                   :key="item.rank" 
                   :rank="item.rank" 
@@ -158,7 +158,7 @@
                   :heat="item.heat" 
                   :label="item.label" 
                   :summary="item.summary" 
-                  @analyze="openAiSidebar(item.title)"
+                  :category="item.category"  :url="item.url"            @analyze="openAiSidebar(item.title)"
                 />
               </div>
             </div>
