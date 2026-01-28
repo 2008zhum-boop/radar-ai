@@ -116,3 +116,53 @@ def generate_outline(title, angle):
     except Exception as e:
         print(f"❌ 大纲失败: {e}")
         return _get_mock_outline(title)
+
+# === 3. 舆情风险研判 (Risk Assessment) ===
+def analyze_risk_assessment(text, target_entity):
+    """
+    分析文本对自己品牌的风险程度，提取真实的风险关键词
+    """
+    if not client: 
+        return {
+            "score": 0,
+            "risk_keywords": [],
+            "reason": "Mock模式: 未配置AI"
+        }
+        
+    print(f"⚠️ AI 舆情研判: {target_entity} in {text[:20]}...")
+    
+    system_prompt = """
+    你是一个资深舆情分析师。请分析给定文本对目标主体(target)的舆情风险。
+    请以 JSON 格式输出：
+    - score: 情感倾向分数，范围 -1.0(极度负面/危机) 到 1.0(极度正面/利好)，0为中性。
+    - risk_keywords: 字符串数组，提取1-3个核心风险关键词（如"刹车失灵"、"财务造假"），如果是正面或无风险则为空数组。
+    - reason: 简短的一句话判断依据。
+    """
+    
+    try:
+        response = client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"目标主体：{target_entity}\n文本内容：{text}"}
+            ],
+            stream=False
+        )
+        
+        raw = response.choices[0].message.content
+        clean = extract_json(raw)
+        data = json.loads(clean)
+        
+        # 兜底检查
+        if "score" not in data: data["score"] = 0
+        if "risk_keywords" not in data: data["risk_keywords"] = []
+        
+        return data
+
+    except Exception as e:
+        print(f"❌ 研判失败: {e}")
+        return {
+            "score": 0, 
+            "risk_keywords": [],
+            "reason": f"AI分析异常: {str(e)}"
+        }

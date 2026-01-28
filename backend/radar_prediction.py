@@ -1,9 +1,8 @@
 import random
+import time
 from radar_weibo import get_weibo_hot_list
 
 # 定义更丰富的逻辑模板
-# {keyword} = 客户名称 (如: 瑞幸)
-# {event} = 真实热点新闻标题 (如: OpenAI发布Sora)
 LOGIC_TEMPLATES = [
     {
         "type": "借势营销",
@@ -32,57 +31,118 @@ LOGIC_TEMPLATES = [
     }
 ]
 
-def generate_predictions(keywords):
+def calculate_acceleration(current_heat, prev_heat=None):
     """
-    输入：前端配置的客户关键词列表 (如 ['瑞幸', '特斯拉'])
+    计算热度加速度
+    """
+    if prev_heat is None:
+        # 模拟上一小时热度
+        prev_heat = current_heat * random.uniform(0.5, 0.9)
+    
+    delta_h = current_heat - prev_heat
+    # 假设 delta_t = 1 hour
+    a = delta_h / 1.0 
+    return int(a)
+
+def get_trend_level(score, acceleration):
+    """
+    根据分数和加速度判定 Level 1-5
+    """
+    if score > 95 and acceleration > 5000:
+        return 5 # P0 爆发
+    if score > 90:
+        return 4
+    if score > 80:
+        return 3
+    if score > 60:
+        return 2
+    return 1
+
+def generate_predictions(client_configs):
+    """
+    输入：client_configs list (dicts with 'brand_keywords')
     输出：结合当下真实热搜的预测选题
     """
     results = []
     
-    # 1. 获取当前真实的综合热搜 (取前 20 条)
-    # 我们混合 微博、36氪、百度 的数据，让素材更丰富
+    # 1. 获取真实热搜
     real_news_pool = []
     try:
-        raw_data = get_weibo_hot_list("综合") # 调用爬虫模块
+        raw_data = get_weibo_hot_list("综合") 
         for source, items in raw_data.items():
-            for item in items[:5]: # 每个来源取前5条，保证不仅是微博
-                real_news_pool.append(item['title'])
+            for item in items[:8]: 
+                # 模拟热度值
+                heat = item.get('heat', random.randint(10000, 1000000))
+                real_news_pool.append({"title": item['title'], "heat": heat})
     except Exception as e:
         print(f"预测模块获取热搜失败: {e}")
-        real_news_pool = ["AI技术突飞猛进", "消费市场回暖", "全球股市波动"] # 兜底数据
+        # Fallback
+        real_news_pool = [
+            {"title": "OpenAI发布Sora", "heat": 500000},
+            {"title": "新能源车降价潮", "heat": 300000}, 
+            {"title": "咖啡价格战", "heat": 100000}
+        ]
 
-    # 如果没有关键词，返回空 (前端会提示去添加)
-    if not keywords:
+    if not client_configs:
         return []
 
-    # 2. 为每个客户生成预测
-    for word in keywords:
-        # 为每个词生成 1-2 条策略
-        count = 1 if len(keywords) > 5 else 2 
+    # 2. 生成预测
+    for client in client_configs:
+        # Extract keywords from JSON logic or dict
+        if isinstance(client, dict):
+             keywords = client.get('brand_keywords', [])
+             client_name = client.get('name', 'Unknown')
+        else:
+             # Handle if it's passed as tuple directly from DB (legacy support)
+             keywords = []
+             client_name = "Unknown"
+
+        if not keywords:
+            continue
+            
+        # Use first brand keyword as representative
+        main_keyword = keywords[0]
+        
+        # Determine number of predictions
+        count = 2 
         
         for _ in range(count):
-            # 随机选一个真实热点
-            event_title = random.choice(real_news_pool)
-            # 简化标题，去掉"爆"、"新"等后缀，只取前15个字避免标题太长
+            # Pick a hot event
+            event_obj = random.choice(real_news_pool)
+            event_title = event_obj['title']
             clean_event = event_title.split(' ')[0][:20]
-
-            # 随机选逻辑
-            logic = random.choice(LOGIC_TEMPLATES)
             
-            # 生成
-            title = logic["title"].format(keyword=word, event=clean_event)
-            reason = logic["reason"].format(keyword=word, event=clean_event)
-            score = random.randint(80, 99)
+            # Logic & Score
+            logic = random.choice(LOGIC_TEMPLATES)
+            base_score = random.randint(70, 95)
+            
+            # Calculate Acceleration (Simulated)
+            acc = calculate_acceleration(event_obj['heat'])
+            
+            # Boost score if acceleration is high
+            if acc > 10000:
+                base_score += 4
+                
+            base_score = min(base_score, 99)
+            
+            level = get_trend_level(base_score, acc)
+            
+            # Rocket Flag
+            is_rocket = (level >= 4 and acc > 5000)
 
             results.append({
-                "keyword": word,
+                "client": client_name,
+                "keyword": main_keyword,
                 "event": clean_event,
                 "type": logic["type"],
-                "title": title,
-                "reason": reason,
-                "score": score
+                "title": logic["title"].format(keyword=main_keyword, event=clean_event),
+                "reason": logic["reason"].format(keyword=main_keyword, event=clean_event),
+                "score": base_score,
+                "level": level,
+                "acceleration": acc,
+                "is_rocket": is_rocket
             })
     
-    # 按分数排序
+    # Sort by Score DESC
     results.sort(key=lambda x: x['score'], reverse=True)
     return results

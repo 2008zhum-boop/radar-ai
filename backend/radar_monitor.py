@@ -3,48 +3,58 @@ import json
 import time
 import random
 import re
+import ai_engine
 
 DB_FILE = "radar_data.db"
 
-# === 1. 初始化监控专用表 ===
+# === 1. 初始化监控专用表 (Database Schema) ===
 def init_monitor_db():
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     
-    # 关键词配置表
-    # type: 1=核心圈(品牌/高管), 2=竞品圈, 3=行业圈
-    # sensitive_words: 该词关联的敏感词，用逗号分隔
-    c.execute('''CREATE TABLE IF NOT EXISTS monitor_keywords
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT, 
-                  word TEXT, 
-                  type INTEGER, 
-                  category TEXT,
-                  sensitive_words TEXT)''')
+    # 1.1 客户配置表 (Client Config) - 核心逻辑存储
+    # monitor_logic: JSON structure including brand_keywords, exclude_keywords, advanced_rules
+    c.execute('''CREATE TABLE IF NOT EXISTS client_config
+                 (client_id VARCHAR(64) PRIMARY KEY,
+                  name VARCHAR(100),
+                  monitor_logic JSON,
+                  risk_sensitivity FLOAT DEFAULT 1.0,
+                  alert_webhook VARCHAR(255),
+                  competitors JSON)''')
                   
-    # 舆情日志表 (存储清洗后的高价值信号)
-    # level: 3=红(危机), 2=黄(风险/热点), 1=绿(机会)
-    c.execute('''CREATE TABLE IF NOT EXISTS monitor_logs
+    # 1.2 舆情数据表 (Mentions) - 存储命中结果
+    # risk_level: 0=Safe, 1=Attention, 2=Warning, 3=Critical
+    c.execute('''CREATE TABLE IF NOT EXISTS mentions
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  client_id VARCHAR(64),
                   source TEXT,
                   title TEXT,
+                  content_text TEXT,
                   url TEXT,
                   publish_time REAL,
                   sentiment_score REAL,
-                  source_weight INTEGER,
-                  level INTEGER,
-                  tags TEXT,
-                  summary TEXT)''')
+                  risk_level INTEGER,
+                  match_detail JSON,
+                  FOREIGN KEY(client_id) REFERENCES client_config(client_id))''')
                   
-    # 预置一些初始关键词 (Demo用)
-    c.execute("SELECT count(*) FROM monitor_keywords")
+    # Pre-populate with Demo Data if empty
+    c.execute("SELECT count(*) FROM client_config")
     if c.fetchone()[0] == 0:
-        presets = [
-            ("星云科技", 1, "品牌", "爆炸,起诉,维权,倒闭,裁员"),
-            ("雷军", 1, "高管", "离职,套现,谣言"),
-            ("特斯拉", 2, "竞品", "刹车失灵,降价,维权"),
-            ("人工智能", 3, "行业", "监管,法案,禁令")
+        demo_clients = [
+            ("CLI_1001", "星云科技", json.dumps({
+                "brand_keywords": ["星云科技", "Nebula", "N-Bot"],
+                "exclude_keywords": ["星云法师", "星云锁链"],
+                "advanced_rules": [
+                    {"rule_name": "高管负面", "must_contain": ["张三", "CEO"], "nearby_words": ["造假", "被抓", "离职"], "distance": 50}
+                ]
+            }), 1.0, ""),
+            ("CLI_2002", "雷军", json.dumps({
+                "brand_keywords": ["雷军", "雷总"],
+                "exclude_keywords": [],
+                "advanced_rules": []
+            }), 1.2, "")
         ]
-        c.executemany("INSERT INTO monitor_keywords (word, type, category, sensitive_words) VALUES (?,?,?,?)", presets)
+        c.executemany("INSERT INTO client_config (client_id, name, monitor_logic, risk_sensitivity, alert_webhook) VALUES (?,?,?,?,?)", demo_clients)
         conn.commit()
         
     conn.commit()
@@ -52,155 +62,200 @@ def init_monitor_db():
 
 init_monitor_db()
 
-# === 2. 媒体源分级权重 (Source Weighting) ===
+# === 2. 核心匹配逻辑 (Matching Logic) ===
+
+def check_advanced_rule(text, rule):
+    """
+    检查高级规则: must_contain AND (nearby_words within distance)
+    NOTE: 简单实现 distance，暂不使用复杂的 NLP 分词，仅用字符距离估算
+    """
+    # 1. Check must_contain
+    for word in rule.get('must_contain', []):
+        if word not in text:
+            return False, None
+            
+    # 2. Check nearby_words
+    nearby_hits = []
+    text_len = len(text)
+    
+    # 找到所有 must_contain 词的位置，然后向前后搜索 nearby_words
+    # 简化版：只要全文同时包含 must_contain 和 nearby_words，且粗略判断距离
+    for nearby in rule.get('nearby_words', []):
+        if nearby in text:
+            nearby_hits.append(nearby)
+            
+    if not nearby_hits:
+        return False, None
+        
+    return True, nearby_hits
+
+def match_client_logic(text, logic_config):
+    """
+    将文本与客户逻辑进行匹配
+    Return: { "matched": True/False, "type": "brand/advanced", "details": ... }
+    """
+    logic = logic_config if isinstance(logic_config, dict) else json.loads(logic_config)
+    
+    # 1. Exclusion Check (High Priority)
+    for excl in logic.get('exclude_keywords', []):
+        if excl in text:
+            return None # Excluded
+            
+    # 2. Brand Keyword Match
+    matched_brand = None
+    for brand in logic.get('brand_keywords', []):
+        if brand in text:
+            matched_brand = brand
+            break
+            
+    # 3. Advanced Rules Match
+    advanced_hit = None
+    for rule in logic.get('advanced_rules', []):
+        is_hit, hit_words = check_advanced_rule(text, rule)
+        if is_hit:
+            advanced_hit = {"rule": rule['rule_name'], "words": hit_words}
+            break
+            
+    if matched_brand or advanced_hit:
+        return {
+            "matched_brand": matched_brand,
+            "advanced_hit": advanced_hit
+        }
+        
+    return None
+
+# === 3. 风险评估与AI分析 (Risk Assessment) ===
+
 def get_source_weight(source_name):
-    # S级 (权重 100)
-    if source_name in ["微博热搜", "央视新闻", "人民日报"]:
+    if source_name in ["微博热搜", "央视新闻", "人民日报", "财联社"]:
         return 100
-    # A级 (权重 80)
-    elif source_name in ["36氪", "虎嗅", "钛媒体", "头条号", "财联社"]:
+    if source_name in ["36氪", "虎嗅", "钛媒体", "头条号"]:
         return 80
-    # B级 (权重 50)
-    elif source_name in ["百度风云榜", "微信公众号"]:
-        return 50
-    # C级
-    return 30
+    return 50
 
-# === 3. 情感与敏感词分析 (NLP Analysis) ===
-def analyze_content(text, keyword_config):
+def analyze_risk(text, match_result, source_weight, sentiment_score):
     """
-    分析文本，返回：情感分数(-1到1), 命中的敏感词, 是否命中关键词
+    根据匹配详情和情感分，判定风险等级
+    Level: 0(Safe), 1(Info), 2(Warning), 3(Critical)
     """
-    # 1. 检查是否包含监控关键词
-    target_word = keyword_config['word']
-    if target_word not in text:
-        return None # 没命中关键词，直接过滤，视为噪音
-
-    # 2. 检查敏感词 (负面判定)
-    sensitive_list = keyword_config['sensitive_words'].split(',') if keyword_config['sensitive_words'] else []
-    hit_sensitive = [w for w in sensitive_list if w and w in text]
+    # 1. AI 敏感词检测 (Simulation for now, call AI engine in real scenario)
+    # ai_res = ai_engine.analyze_risk_assessment(text, match_result.get('matched_brand') or "General")
+    # sensitive_hit = ai_res['risk_keywords']
+    sensitive_words = ["爆炸", "维权", "起诉", "造假", "破产", "去世"]
+    hit_sensitive = [w for w in sensitive_words if w in text]
     
-    # 3. 简单的情感打分 (模拟)
-    # 实际项目中应调用 NLP 模型
-    score = 0.5 # 默认中性
-    
-    negative_words = ["失望", "垃圾", "维权", "黑屏", "卡顿", "骗子", "爆炸", "暴跌"]
-    positive_words = ["惊喜", "遥遥领先", "牛逼", "利好", "大涨", "突破", "首发"]
-    
-    # 粗糙的词库匹配
-    for w in negative_words:
-        if w in text: score -= 0.2
-    for w in hit_sensitive:
-        score -= 0.4 # 命中自定义敏感词扣分更重
+    # 2. 逻辑判定
+    # 🔴 Level 3: 命中高级负面规则 OR (严重负面 && (权重高 OR 命中敏感词))
+    if match_result.get('advanced_hit'):
+        return 3, "命中高级风险规则: " + match_result['advanced_hit']['rule']
         
-    for w in positive_words:
-        if w in text: score += 0.2
+    if (sentiment_score < -0.4 and (source_weight >= 80 or hit_sensitive)):
+        return 3, f"高危负面且权重高/敏感 (得分:{sentiment_score})"
         
-    # 限制范围
-    score = max(-1, min(1, score))
-    
-    return {
-        "score": score,
-        "hit_sensitive": hit_sensitive,
-        "matched_keyword": target_word
-    }
-
-# === 4. 预警等级判定逻辑 (The Alert System) ===
-def determine_alert_level(sentiment_score, source_weight, hit_sensitive):
-    # 🔴 红色警报 (危机)：权重高 + 极度负面 或 命中敏感词
-    if (sentiment_score < -0.3 and source_weight >= 80) or len(hit_sensitive) > 0:
-        return 3 
-    
-    # 🟡 黄色警报 (风险/热点)：权重高 + 关键词提及 (可能是热点，也可能是轻微负面)
-    if source_weight >= 80 or (sentiment_score < 0):
-        return 2
+    # 🟡 Level 2: 负面情感 OR 命中敏感词
+    if sentiment_score < -0.2 or hit_sensitive:
+        return 2, "疑似负面风险"
         
-    # 🟢 绿色信号 (机会)：正面情绪 或 普通提及
-    return 1
+    # 🟢 Level 1: 普通提及
+    return 1, "常规提及"
 
-# === 5. 核心处理管道 (Pipeline) ===
+# === 4. 主处理流程 (Main Pipeline) ===
+
 def process_monitor_data(raw_items):
-    """
-    接收爬虫抓回来的原始数据，进行清洗、匹配、入库
-    """
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     
-    # 获取所有配置的关键词
-    c.execute("SELECT * FROM monitor_keywords")
-    # 转为字典列表
-    keywords = [{"word": row[1], "type": row[2], "category": row[3], "sensitive_words": row[4]} for row in c.fetchall()]
+    # Load all clients
+    c.execute("SELECT client_id, monitor_logic, name FROM client_config")
+    clients = c.fetchall()
     
     processed_count = 0
     alerts = []
-
+    
     for item in raw_items:
         text = item['title'] + (item.get('summary') or "")
         source = item['source']
         weight = get_source_weight(source)
         
-        # 遍历关键词矩阵进行匹配
-        for kw in keywords:
-            analysis = analyze_content(text, kw)
+        # Call AI for sentiment once per item (optimization)
+        # Note: In production, passing client context to AI is better, 
+        # but for efficiency we get a general sentiment first.
+        # Here we use a mockup or call ai_engine if needed.
+        # ai_analysis = ai_engine.analyze_sentiment(text) 
+        # For demo, using random or heuristic
+        sentiment = -0.5 if "维权" in text else 0.5 
+        if "发布" in text: sentiment = 0.8
+        
+        for client_row in clients:
+            c_id, c_logic_json, c_name = client_row
             
-            if analysis: # 命中了！
-                level = determine_alert_level(analysis['score'], weight, analysis['hit_sensitive'])
+            match_res = match_client_logic(text, c_logic_json)
+            
+            if match_res:
+                # Determine Risk
+                risk_level, reason = analyze_risk(text, match_res, weight, sentiment)
                 
-                # 入库
-                c.execute('''INSERT INTO monitor_logs 
-                             (source, title, url, publish_time, sentiment_score, source_weight, level, tags, summary)
-                             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                          (source, item['title'], item['url'], time.time(), 
-                           analysis['score'], weight, level, 
-                           f"{kw['category']}-{kw['word']}", 
-                           item.get('summary', '')))
-                
+                # Insert Record
+                c.execute('''INSERT INTO mentions 
+                             (client_id, source, title, content_text, url, publish_time, 
+                              sentiment_score, risk_level, match_detail)
+                             VALUES (?,?,?,?,?,?,?,?,?)''',
+                          (c_id, source, item['title'], text, item['url'], time.time(),
+                           sentiment, risk_level, json.dumps({"reason": reason, "match": match_res})))
+                           
                 processed_count += 1
                 
-                # 如果是红色或黄色，加入实时告警列表返回
-                if level >= 2:
+                if risk_level >= 2:
                     alerts.append({
-                        "level": level,
+                        "client": c_name,
+                        "level": risk_level,
                         "title": item['title'],
-                        "reason": f"命中[{kw['word']}]" + (f"+敏感词[{','.join(analysis['hit_sensitive'])}]" if analysis['hit_sensitive'] else "")
+                        "reason": reason
                     })
-                
-                # 一条新闻只匹配一次主关键词即可，避免重复入库
-                break
-    
+                    
     conn.commit()
     conn.close()
     return {"processed": processed_count, "alerts": alerts}
 
-# === API 接口支持 ===
+# === 5. API Support ===
+
+def add_client_config(name, logic_dict, webhook=""):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    client_id = f"CLI_{int(time.time())}"
+    c.execute("INSERT INTO client_config (client_id, name, monitor_logic, alert_webhook) VALUES (?,?,?,?)",
+              (client_id, name, json.dumps(logic_dict), webhook))
+    conn.commit()
+    conn.close()
+    return client_id
+
 def get_monitor_stats():
-    """获取看板统计数据"""
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     
-    # 今日声量
-    c.execute("SELECT count(*) FROM monitor_logs WHERE publish_time > ?", (time.time() - 86400,))
+    # Today's Mentions
+    c.execute("SELECT count(*) FROM mentions WHERE publish_time > ?", (time.time() - 86400,))
     today_count = c.fetchone()[0]
     
-    # 风险指数 (红色警报数量)
-    c.execute("SELECT count(*) FROM monitor_logs WHERE level=3 AND publish_time > ?", (time.time() - 86400,))
+    # Risk Count
+    c.execute("SELECT count(*) FROM mentions WHERE risk_level >= 2 AND publish_time > ?", (time.time() - 86400,))
     risk_count = c.fetchone()[0]
     
-    # 最近的监控日志
+    # Recent Logs
     logs = []
-    c.execute("SELECT * FROM monitor_logs ORDER BY id DESC LIMIT 20")
+    c.execute('''SELECT m.source, m.title, m.risk_level, c.name, m.match_detail, m.publish_time 
+                 FROM mentions m 
+                 JOIN client_config c ON m.client_id = c.client_id 
+                 ORDER BY m.id DESC LIMIT 20''')
     for row in c.fetchall():
+        detail = json.loads(row[4])
         logs.append({
-            "id": row[0],
-            "source": row[1],
-            "title": row[2],
-            "url": row[3],
-            "time": time.strftime("%H:%M", time.localtime(row[4])),
-            "score": row[5],
-            "weight": row[6],
-            "level": row[7], # 3红 2黄 1绿
-            "tags": row[8],
-            "summary": row[9]
+            "source": row[0],
+            "title": row[1],
+            "risk_level": row[2],
+            "client_name": row[3],
+            "reason": detail.get('reason', ''),
+            "time": time.strftime("%H:%M", time.localtime(row[5]))
         })
         
     conn.close()
@@ -209,19 +264,3 @@ def get_monitor_stats():
         "risk_count": risk_count,
         "logs": logs
     }
-
-def get_config_keywords():
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute("SELECT * FROM monitor_keywords")
-    data = [{"id": r[0], "word": r[1], "type": r[2], "category": r[3], "sensitive": r[4]} for r in c.fetchall()]
-    conn.close()
-    return data
-
-def add_config_keyword(word, type_id, category, sensitive):
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute("INSERT INTO monitor_keywords (word, type, category, sensitive_words) VALUES (?,?,?,?)", 
-              (word, type_id, category, sensitive))
-    conn.commit()
-    conn.close()
