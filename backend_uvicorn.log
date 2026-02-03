@@ -1,0 +1,244 @@
+INFO:     Started server process [6478]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:57599 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57611 - "POST /auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57611 - "OPTIONS /auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57611 - "GET /auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57611 - "OPTIONS /hotlist?category=%E7%BB%BC%E5%90%88 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57613 - "OPTIONS /monitor/clients HTTP/1.1" 200 OK
+[微博] 抓取中...
+INFO:     127.0.0.1:57613 - "GET /monitor/clients HTTP/1.1" 200 OK
+[头条] 抓取中...
+🗞️ AI 提炼新闻: 英首相外滩Citywalk后进入和平饭店
+🗞️ AI 提炼新闻: 应急管理部部长王祥喜被查
+🗞️ AI 提炼新闻: 舟山守岛人招2男2女：2个月休4天
+🗞️ AI 提炼新闻: 解放军军机穿越菲军演划设区
+🗞️ AI 提炼新闻: 我国已拥有全球最完整风电产业链
+🗞️ AI 提炼新闻: 金饰克价一夜大跌上百元
+🗞️ AI 提炼新闻: 山西一县委原书记搞政绩工程被双开
+🗞️ AI 提炼新闻: 媒体人：菲军演禁区成纸上禁令
+🗞️ AI 提炼新闻: 丫丫回国两年多已判若两熊
+🗞️ AI 提炼新闻: 女子吐槽商场广告牌上没女性财神
+🗞️ AI 提炼新闻: 郑丽文抛“两岸和平框架”蓝图
+🗞️ AI 提炼新闻: 我国有哪些顶尖科技
+🗞️ AI 提炼新闻: 斯塔默与影后裴淳华在沪参加活动
+🗞️ AI 提炼新闻: 外国政要爱吃的中国菜都有啥
+🗞️ AI 提炼新闻: 家委会收每生263.3元 家长报警
+🗞️ AI 提炼新闻: 华人在好莱坞做团播：动作不能太性感
+🗞️ AI 提炼新闻: 夫妻夜间高速行车凭超高意识避免事故
+🗞️ AI 提炼新闻: 血汗钱不翼而飞 银行甩锅谁来说不
+🗞️ AI 提炼新闻: 甘肃一拆迁工地挖出银元？假的
+🗞️ AI 提炼新闻: 中国人为啥偏爱iPhone
+🗞️ AI 提炼新闻: 男子公司年会中10万又抽到苹果手机
+🗞️ AI 提炼新闻: 轰6K突破美菲演习区释放何信号
+🗞️ AI 提炼新闻: 重病白马屠宰场被救3年后脱胎换骨
+🗞️ AI 提炼新闻: 弟弟头卡进栅栏哥哥成功秒救
+🗞️ AI 提炼新闻: 女子来例假像渡劫发现11cm肌瘤
+🗞️ AI 提炼新闻: 黄岩岛战备警巡现场实拍
+🗞️ AI 提炼新闻: 陈书平当选成都市市长
+🗞️ AI 提炼新闻: 54岁中国籍女性在日死亡或为他杀
+🗞️ AI 提炼新闻: 女子离婚5天后前夫去世 抚恤金引纠纷
+🗞️ AI 提炼新闻: 在意失联博士靠父母搬砖供上学
+INFO:     127.0.0.1:57815 - "GET /monitor/clients HTTP/1.1" 200 OK
+[微信] 抓取中...
+🗞️ AI 提炼新闻: 微信公开课：视频号GMV增长3倍
+🗞️ AI 提炼新闻: 大模型时代的很多应用其实都是伪需求
+🗞️ AI 提炼新闻: 拼多多市值超越阿里给我们的启示
+[B站] 抓取中...
+[百度] 抓取中...
+🗞️ AI 提炼新闻: 中非携手共逐发展振兴梦
+🗞️ AI 提炼新闻: 应急管理部部长王祥喜被查
+🗞️ AI 提炼新闻: 美国政府又“停摆”了
+🗞️ AI 提炼新闻: 刷新多项纪录！中国在多领域实现突破
+🗞️ AI 提炼新闻: 买家称退衣服不慎寄走奔驰钥匙
+🗞️ AI 提炼新闻: 丫丫回国两年多已判若两熊
+🗞️ AI 提炼新闻: 解放军军机飞进菲军演划设区
+🗞️ AI 提炼新闻: 早睡早起和晚睡晚起的人 谁更健康
+🗞️ AI 提炼新闻: 舟山守岛人招2男2女：2个月下1次岛
+🗞️ AI 提炼新闻: 花生这辈子没想到还能被切丝
+INFO:     127.0.0.1:57951 - "OPTIONS /content/library/search HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57954 - "OPTIONS /content/blacklist HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57955 - "OPTIONS /content/quality-stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57953 - "GET /monitor/clients HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57954 - "GET /content/blacklist HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57951 - "POST /content/library/search HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57955 - "GET /content/quality-stats HTTP/1.1" 200 OK
+🗞️ AI 提炼新闻: 学生将粉笔雕成宝剑 校长捧哏式夸赞
+🗞️ AI 提炼新闻: 官方粉碎涉铁路十大谣言
+🗞️ AI 提炼新闻: 均价300元/克入手的金条 阿姨全卖了
+🗞️ AI 提炼新闻: 女子离婚后前夫去世 婆家争抚恤金
+🗞️ AI 提炼新闻: 何猷君当选新职
+🗞️ AI 提炼新闻: 《小鬼当家》中饰演“妈妈”演员去世
+🗞️ AI 提炼新闻: 日本发现中国女性遗体 初步认定他杀
+🗞️ AI 提炼新闻: 日本警方回应中国籍女性死亡事件
+🗞️ AI 提炼新闻: 乘客带400万黄金坐高铁 安检员报警
+🗞️ AI 提炼新闻: 女孩穿上新鞋突然高烧39℃不退
+INFO:     127.0.0.1:57611 - "GET /hotlist?category=%E7%BB%BC%E5%90%88 HTTP/1.1" 200 OK
+[微博] 抓取中...
+[B站] 抓取中...
+INFO:     127.0.0.1:57968 - "GET /hotlist?category=%E7%BB%BC%E5%90%88 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58072 - "GET /content/quality-stats HTTP/1.1" 200 OK
+[微博] 抓取中...
+[B站] 抓取中...
+INFO:     127.0.0.1:58072 - "GET /hotlist?category=%E7%BB%BC%E5%90%88 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58154 - "GET /content/quality-stats HTTP/1.1" 200 OK
+[微博] 抓取中...
+[B站] 抓取中...
+INFO:     127.0.0.1:58154 - "GET /hotlist?category=%E7%BB%BC%E5%90%88 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58439 - "GET /content/quality-stats HTTP/1.1" 200 OK
+[微博] 抓取中...
+[B站] 抓取中...
+INFO:     127.0.0.1:58439 - "GET /hotlist?category=%E7%BB%BC%E5%90%88 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58688 - "GET /monitor/clients HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58711 - "GET /monitor/clients HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58711 - "OPTIONS /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58711 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58711 - "OPTIONS /monitor/config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58711 - "GET /monitor/config HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:58768 - "GET /content/quality-stats HTTP/1.1" 200 OK
+[微博] 抓取中...
+[B站] 抓取中...
+INFO:     127.0.0.1:58768 - "GET /hotlist?category=%E7%BB%BC%E5%90%88 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58768 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58891 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58903 - "GET /content/quality-stats HTTP/1.1" 200 OK
+[微博] 抓取中...
+[B站] 抓取中...
+INFO:     127.0.0.1:58903 - "GET /hotlist?category=%E7%BB%BC%E5%90%88 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58903 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58976 - "GET /monitor/clients HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58976 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58976 - "GET /monitor/config HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:58976 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58999 - "GET /content/quality-stats HTTP/1.1" 200 OK
+[微博] 抓取中...
+[B站] 抓取中...
+INFO:     127.0.0.1:58999 - "GET /hotlist?category=%E7%BB%BC%E5%90%88 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58999 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58999 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59146 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59146 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59205 - "GET /content/quality-stats HTTP/1.1" 200 OK
+[微博] 抓取中...
+[B站] 抓取中...
+INFO:     127.0.0.1:59205 - "GET /hotlist?category=%E7%BB%BC%E5%90%88 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59205 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59244 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59585 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59585 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59745 - "GET /content/quality-stats HTTP/1.1" 200 OK
+[微博] 抓取中...
+[B站] 抓取中...
+INFO:     127.0.0.1:59745 - "GET /hotlist?category=%E7%BB%BC%E5%90%88 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59745 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59846 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59928 - "GET /content/blacklist HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59927 - "GET /monitor/clients HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59926 - "POST /content/library/search HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59930 - "GET /content/quality-stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59950 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59950 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59969 - "GET /content/quality-stats HTTP/1.1" 200 OK
+[微博] 抓取中...
+[B站] 抓取中...
+INFO:     127.0.0.1:59969 - "GET /hotlist?category=%E7%BB%BC%E5%90%88 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59969 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59969 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59993 - "GET /content/quality-stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60010 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60010 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60029 - "GET /content/quality-stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60029 - "OPTIONS /hotlist?category=%E7%BB%BC%E5%90%88 HTTP/1.1" 200 OK
+[微博] 抓取中...
+[B站] 抓取中...
+INFO:     127.0.0.1:60029 - "GET /hotlist?category=%E7%BB%BC%E5%90%88 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60029 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60029 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60056 - "OPTIONS /content/quality-stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60056 - "GET /content/quality-stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60061 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60061 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60098 - "GET /content/quality-stats HTTP/1.1" 200 OK
+[微博] 抓取中...
+[B站] 抓取中...
+INFO:     127.0.0.1:60098 - "GET /hotlist?category=%E7%BB%BC%E5%90%88 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60098 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60098 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60125 - "GET /content/quality-stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60157 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60157 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60204 - "GET /content/quality-stats HTTP/1.1" 200 OK
+[微博] 抓取中...
+[B站] 抓取中...
+INFO:     127.0.0.1:60204 - "GET /hotlist?category=%E7%BB%BC%E5%90%88 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60204 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60204 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60260 - "GET /content/quality-stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60334 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60336 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60400 - "GET /content/quality-stats HTTP/1.1" 200 OK
+[微博] 抓取中...
+[B站] 抓取中...
+INFO:     127.0.0.1:60400 - "GET /hotlist?category=%E7%BB%BC%E5%90%88 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60450 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60452 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60452 - "GET /content/quality-stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60603 - "OPTIONS /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60604 - "OPTIONS /monitor/dashboard HTTP/1.1" 200 OK
+[微博] 抓取中...
+INFO:     127.0.0.1:60603 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60607 - "GET /content/quality-stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60604 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+[B站] 抓取中...
+INFO:     127.0.0.1:60604 - "GET /content/quality-stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60608 - "GET /hotlist?category=%E7%BB%BC%E5%90%88 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60808 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60808 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+[微博] 抓取中...
+INFO:     127.0.0.1:60810 - "GET /content/quality-stats HTTP/1.1" 200 OK
+[B站] 抓取中...
+INFO:     127.0.0.1:60810 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60810 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60845 - "GET /content/quality-stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60851 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60851 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60892 - "GET /content/quality-stats HTTP/1.1" 200 OK
+[微博] 抓取中...
+[B站] 抓取中...
+INFO:     127.0.0.1:60892 - "GET /hotlist?category=%E7%BB%BC%E5%90%88 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60892 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60964 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60999 - "GET /content/quality-stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61013 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61015 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+[微博] 抓取中...
+INFO:     127.0.0.1:61062 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61059 - "GET /content/quality-stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61065 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+[B站] 抓取中...
+INFO:     127.0.0.1:61060 - "GET /hotlist?category=%E7%BB%BC%E5%90%88 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61260 - "GET /content/quality-stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61260 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+[微博] 抓取中...
+INFO:     127.0.0.1:61262 - "GET /content/quality-stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61266 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+[B站] 抓取中...
+INFO:     127.0.0.1:61266 - "OPTIONS /content/library/search HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61262 - "OPTIONS /monitor/clients HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61260 - "OPTIONS /content/blacklist HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61266 - "POST /content/library/search HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61262 - "GET /content/blacklist HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61260 - "GET /monitor/clients HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61302 - "GET /content/quality-stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61302 - "GET /content/quality-stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61320 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61320 - "GET /monitor/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64542 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64542 - "GET /favicon.ico HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:64990 - "GET / HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [6478]
