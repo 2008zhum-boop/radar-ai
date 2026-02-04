@@ -86,6 +86,7 @@
             @click-item="handleClickItem"
             @dismiss="handleDismiss"
             @instant-draft="handleInstantDraft"
+            @add-selection="handleAddSelection"
          />
       </div>
     </div>
@@ -149,7 +150,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, inject, computed, watch, nextTick } from 'vue'
 import HotTable from './HotTable.vue'
-import { getHotList, analyzeTopic, getClients } from '../services/api'
+import { getHotList, analyzeTopic, getClients, addSelection } from '../services/api'
 
 const emit = defineEmits(['start-instant-draft'])
 
@@ -431,6 +432,19 @@ const handleDismiss = (title) => {
 
 const handleInstantDraft = (topic) => {
     emit('start-instant-draft', topic)
+}
+
+const handleAddSelection = async (item) => {
+    try {
+        await addSelection({
+            topic: item.title,
+            source: 'Hotspot',
+            hotspot_id: item.url
+        })
+        alert("已添加到我的选题！")
+    } catch (e) {
+        alert("添加失败: " + (e.response?.data?.message || e.message))
+    }
 }
 
 const handleClickItem = (item) => {

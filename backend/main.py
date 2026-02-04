@@ -21,7 +21,14 @@ from radar_monitor import (
     remove_source_from_blacklist,
     associate_content_to_client,
     correct_content_classification,
+    correct_content_classification,
     get_content_quality_stats
+)
+from radar_selections import (
+    add_selection, 
+    get_selections, 
+    update_selection_status, 
+    delete_selection
 )
 from radar_report import generate_client_report
 from ai_engine import generate_analysis, generate_outline, generate_article_from_outline, polish_interview_notes, refine_article_with_chat
@@ -29,7 +36,131 @@ from ai_engine import generate_analysis, generate_outline, generate_article_from
 import io
 from fastapi import UploadFile, File
 
-# ... (omitted)
+from radar_auth import (
+    User, get_current_active_user, get_admin_user, 
+    create_access_token, get_user, create_user, verify_password,
+    list_users, update_user_role, delete_user, Token
+)
+
+app = FastAPI()
+
+# CORS
+origins = [
+    "http://localhost:5173",
+    "http://localhost:8000",
+    "https://radar-ai-woad.vercel.app",
+    "https://radar-backend-cvaq.onrender.com"
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# === Auth Logic ===
+@app.post("/auth/register")
+def register(user: User, password: str = Body(..., embed=True)):
+    success, msg = create_user(user, password)
+    if not success:
+        raise HTTPException(status_code=400, detail=msg)
+    return {"status": "success", "username": user.username}
+
+@app.post("/auth/login", response_model=Token)
+def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+    user = get_user(form_data.username)
+    if not user or not verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token = create_access_token(
+        data={"sub": user.username, "role": user.role}
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
+
+@app.get("/auth/me", response_model=User)
+def read_users_me(current_user: User = Depends(get_current_active_user)):
+    return current_user
+
+# === Admin Logic ===
+@app.get("/admin/users")
+def get_all_users(user: User = Depends(get_admin_user)):
+    return list_users()
+
+@app.post("/admin/user/role")
+def change_role(
+    username: str = Body(...), 
+    role: str = Body(...), 
+    status: int = Body(...),
+    user: User = Depends(get_admin_user)
+):
+    update_user_role(username, role, status)
+    return {"status": "success"}
+
+@app.post("/admin/user/delete")
+def remove_user(username: str = Body(...), user: User = Depends(get_admin_user)):
+    delete_user(username)
+    return {"status": "success"}
+
+# === Core Business Logic Endpoints ===
+
+@app.get("/hotlist")
+def api_hotlist(category: str = "综合", user: User = Depends(get_current_active_user)):
+    return {"status": "success", "data": get_weibo_hot_list(category)}
+
+class PredictionReq(BaseModel):
+    keywords: List[str]
+
+@app.post("/predictions")
+def api_predictions(req: PredictionReq, user: User = Depends(get_current_active_user)):
+    return generate_predictions(req.keywords)
+
+@app.get("/prediction/trends")
+def api_predict_global_trends(user: User = Depends(get_current_active_user)):
+    return {"status": "success", "data": predict_future_trends()}
+
+# 监控相关
+@app.get("/monitor/clients")
+def api_get_clients(user: User = Depends(get_current_active_user)):
+    return get_all_clients()
+
+class ClientSaveReq(BaseModel):
+    id: Optional[str] = None
+    name: str
+    industry: str
+    competitors: List[str]
+    products: List[str]
+    config: dict
+
+@app.post("/monitor/client/save")
+def api_save_client(req: ClientSaveReq, user: User = Depends(get_current_active_user)):
+    return save_full_client_config(req.dict())
+
+class ClientDelReq(BaseModel):
+    client_id: str
+
+@app.post("/monitor/client/delete")
+def api_delete_client(req: ClientDelReq, user: User = Depends(get_current_active_user)):
+    return delete_client_by_id(req.client_id)
+
+class ReportReq(BaseModel):
+    client_id: str
+
+@app.post("/monitor/report/generate")
+def api_gen_report(req: ReportReq, user: User = Depends(get_current_active_user)):
+    return generate_client_report(req.client_id)
+
+# === Models ===
+class AiAnalyzeReq(BaseModel):
+    topic: str
+    instruction: Optional[str] = None
+
+class AiOutlineReq(BaseModel):
+    topic: str
+    angle: str
 
 @app.post("/ai/analyze")
 def api_analyze_topic(req: AiAnalyzeReq, user: User = Depends(get_current_active_user)):
@@ -77,6 +208,7 @@ class GenerateArticleReq(BaseModel):
     title: str
     outline: List[dict]  # [{ title, sub_points }] 或 前端传 structure
     context: Optional[str] = ""
+    selection_id: Optional[int] = None  # Optional linkage to a selection
 
 @app.post("/analyze")
 def analyze_topic(req: AnalyzeTopicReq, user: User = Depends(get_current_active_user)):
@@ -112,6 +244,11 @@ def api_generate_article(req: GenerateArticleReq, user: User = Depends(get_curre
     else:
         outline = [{"title": str(s), "sub_points": []} for s in (outline or [])]
     full_text = generate_article_from_outline(req.title, outline, req.context or "")
+    
+    # If linked to a selection, mark it as completed
+    if req.selection_id:
+        update_selection_status(req.selection_id, user.username, "completed")
+        
     return {"status": "success", "data": full_text}
 
 # ==========================================
@@ -222,6 +359,46 @@ def correct_ai_judgment(req: CorrectionReq, user: User = Depends(get_current_act
 def fetch_quality_stats(user: User = Depends(get_current_active_user)):
     """获取数据质检统计"""
     return get_content_quality_stats()
+
+# ==========================================
+# === 我的选题管理接口 ===
+# ==========================================
+class SelectionAddReq(BaseModel):
+    topic: str
+    source: str = "Manual"
+    hotspot_id: Optional[str] = None
+
+class SelectionUpdateReq(BaseModel):
+    id: int
+    status: str
+
+class SelectionDelReq(BaseModel):
+    id: int
+
+class SelectionListReq(BaseModel):
+    page: int = 1
+    page_size: int = 20
+    status: Optional[str] = None  # todo, completed, abandoned, all
+
+@app.post("/selections/add")
+def api_add_selection(req: SelectionAddReq, user: User = Depends(get_current_active_user)):
+    """添加我的选题"""
+    return add_selection(user.username, req.topic, req.source, req.hotspot_id)
+
+@app.post("/selections/list")
+def api_list_selections(req: SelectionListReq, user: User = Depends(get_current_active_user)):
+    """获取我的选题列表"""
+    return get_selections(user.username, req.status, req.page, req.page_size)
+
+@app.post("/selections/update_status")
+def api_update_selection_status(req: SelectionUpdateReq, user: User = Depends(get_current_active_user)):
+    """更新选题状态"""
+    return update_selection_status(req.id, user.username, req.status)
+
+@app.post("/selections/delete")
+def api_delete_selection(req: SelectionDelReq, user: User = Depends(get_current_active_user)):
+    """删除选题"""
+    return delete_selection(req.id, user.username)
 
 # ==========================================
 # === 智能创作 - 文章管理接口 ===
@@ -362,6 +539,67 @@ def polish_raw_text_endpoint(req: PolishTextReq):
         return {"data": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# ==========================================
+# === Agent 管理接口 ===
+# ==========================================
+from radar_agent import create_agent, get_agents, delete_agent, run_agent_task, update_agent
+
+class AgentCreateReq(BaseModel):
+    name: str
+    angle: str
+    prompt: str
+    style: Optional[str] = ""
+    word_count: Optional[int] = 1500
+    source: Optional[str] = ""
+    keywords: Optional[str] = ""
+
+class AgentUpdateReq(BaseModel):
+    id: int
+    name: str
+    angle: str
+    prompt: str
+    style: Optional[str] = ""
+    word_count: Optional[int] = 1500
+    source: Optional[str] = ""
+    keywords: Optional[str] = ""
+
+class AgentRunReq(BaseModel):
+    agent_id: int
+
+class AgentDelReq(BaseModel):
+    agent_id: int
+
+@app.get("/agents/list")
+def api_list_agents(user: User = Depends(get_current_active_user)):
+    """获取所有Agent"""
+    return {"status": "success", "data": get_agents()}
+
+@app.post("/agents/create")
+def api_create_agent(req: AgentCreateReq, user: User = Depends(get_current_active_user)):
+    """创建Agent"""
+    aid = create_agent(req.name, req.angle, req.prompt, req.style, req.word_count, req.source, req.keywords)
+    return {"status": "success", "id": aid}
+
+@app.post("/agents/update")
+def api_update_agent(req: AgentUpdateReq, user: User = Depends(get_current_active_user)):
+    """更新Agent"""
+    return update_agent(req.id, req.name, req.angle, req.prompt, req.style, req.word_count, req.source, req.keywords)
+
+@app.post("/agents/delete")
+def api_delete_agent(req: AgentDelReq, user: User = Depends(get_current_active_user)):
+    """删除Agent"""
+    delete_agent(req.agent_id)
+    return {"status": "success"}
+
+@app.post("/agents/run")
+def api_run_agent(req: AgentRunReq, user: User = Depends(get_current_active_user)):
+    """运行Agent执行抓取和写作任务"""
+    result = run_agent_task(req.agent_id, user.username)
+    if "error" in result:
+         raise HTTPException(status_code=400, detail=result["error"])
+    return {"status": "success", "result": result}
+
 
 
 from ai_engine import generate_analysis, generate_outline, generate_article_from_outline, polish_interview_notes, refine_article_with_chat, generate_cover_image, smart_parse_topic

@@ -685,8 +685,8 @@ def get_global_content_library(search_text="", client_id=None, source_filter=Non
     for row in rows:
         # 计算热度分值（基于情感、风险等级、来源权重）
         weight = get_source_weight(row[2])  # source
-        sentiment = row[7]  # sentiment_score
-        risk = row[8]  # risk_level
+        sentiment = row[7] if row[7] is not None else 0  # sentiment_score
+        risk = row[8] if row[8] is not None else 0  # risk_level
         hotness_score = (risk * 30) + (weight * 0.3) + max(0, sentiment * 50)
         tags_val = (row[12] or "") if has_manual_tags and len(row) > 12 else ""
         items.append({

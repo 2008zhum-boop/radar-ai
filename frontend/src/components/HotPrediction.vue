@@ -245,13 +245,12 @@
 
 <script setup>
 import { ref, onMounted, computed, defineEmits } from 'vue'
-import axios from 'axios'
+import { getGlobalTrends } from '../services/api'
 import VChart from 'vue-echarts'
 import { use } from 'echarts/core'
 import { LineChart } from 'echarts/charts'
 import { GridComponent, TooltipComponent, DataZoomComponent, MarkPointComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
-import { API_URL } from '../services/api'
 
 use([LineChart, GridComponent, TooltipComponent, DataZoomComponent, MarkPointComponent, CanvasRenderer])
 
@@ -295,11 +294,8 @@ const generatedTopics = ref([])
 const fetchData = async () => {
     loading.value = true
     try {
-        const token = localStorage.getItem('token')
-        const res = await axios.get(`${API_URL}/prediction/trends`, {
-            headers: { Authorization: `Bearer ${token}` }
-        })
-        const raw = res.data.data || []
+        const res = await getGlobalTrends()
+        const raw = res.data || []
         
         // Helper to get random category (excluding 'all')
         const getRandomCat = () => {

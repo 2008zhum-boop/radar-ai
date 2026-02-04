@@ -21,10 +21,10 @@
             {{ loading ? '登录中...' : '登 录' }}
         </button>
 
-        <!-- <div class="footer-links">
+        <div class="footer-links">
            <span>没有账号？</span>
            <span class="link" @click="$emit('switch', 'register')">立即注册</span>
-        </div> -->
+        </div>
       </div>
     </div>
   </div>

@@ -98,6 +98,9 @@
         <button class="action-btn blue" @click.stop="$emit('analyze', item)">
            <span class="btn-icon">📊</span> 深度分析
         </button>
+        <button class="action-btn purple" @click.stop="$emit('add-selection', item)">
+           <span class="btn-icon">📌</span> 加入选题
+        </button>
         <button class="action-btn green" @click.stop="$emit('instant-draft', item.title)">
            <span class="btn-icon">⚡</span> 极速成稿
         </button>
@@ -306,4 +309,5 @@ const highlightKeywords = (text) => {
 .action-btn:hover { transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
 .action-btn.blue { background: #eff6ff; color: #2563eb; }
 .action-btn.green { background: #f0fdf4; color: #16a34a; }
+.action-btn.purple { background: #f3e8ff; color: #9333ea; }
 </style>

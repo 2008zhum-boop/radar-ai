@@ -289,9 +289,46 @@ def analyze_risk_assessment(text, target_entity):
 
 # === 4. 新闻核心提炼 (List Summary) ===
 def _get_mock_summary(title):
+    import random
+    
+    # 随机事实模板
+    fact_templates = [
+        f"{title} 引发广泛关注，各方观点不一，核心争议点集中在行业影响上。",
+        f"关于 {title} 的讨论持续升温，数据表明这可能是一个重要的转折点。",
+        f"最新消息显示 {title} 正成为焦点，专家建议保持理性看待。",
+        f"{title} 事件背后隐藏着深层次的商业逻辑，值得深挖。",
+        f"随着 {title} 的发酵，公众对于相关领域的关注度达到新高。"
+    ]
+    
+    # 随机角度模板 (A/B/C 组)
+    angle_groups = [
+        [
+            f"1. 《深度复盘：{title} 的前世今生》",
+            f"2. 《{title}：资本狂欢还是技术革命？》",
+            f"3. 《当我们在谈论 {title} 时，我们在谈论什么》"
+        ],
+        [
+            f"1. 《{title} 背后的隐秘利益链条》",
+            f"2. 《被误读的 {title}：真相究竟是什么？》",
+            f"3. 《独家分析：{title} 对普通人的影响》"
+        ],
+        [
+            f"1. 《{title}：一场注定要发生的变革》",
+            f"2. 《风口之下的 {title}：谁是赢家？》",
+            f"3. 《{title} 之后，行业将何去何从？》"
+        ],
+        [
+             f"1. 《{title} 爆火背后的底层逻辑》",
+             f"2. 《一文看懂 {title} 的核心争议》",
+             f"3. 《{title}：或许是今年最大的机会》"
+        ]
+    ]
+    
+    selected_angles = random.choice(angle_groups)
+    
     return {
-        "fact": f"{title} 事件持续发酵，核心在于其对传统模式的颠覆。",
-        "angle": "1. 《深挖：{title} 背后的资本局》\n2. 《{title}：一场被低估的变革》\n3. 《普通人如何在 {title} 中分一杯羹？》",
+        "fact": random.choice(fact_templates),
+        "angle": "\n".join(selected_angles),
         "category": "综合",
         "tags": ["热点", "趋势"]
     }

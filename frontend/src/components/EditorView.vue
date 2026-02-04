@@ -623,7 +623,8 @@ const generateFullArticle = async () => {
         const res = await generateArticle(
            articleTitle.value,
            outlineData.value.structure,
-           props.initialData.topic
+           props.initialData.topic,
+           props.initialData.selectionId
         )
         if (res && res.status === 'success' && res.data) {
             let html = res.data

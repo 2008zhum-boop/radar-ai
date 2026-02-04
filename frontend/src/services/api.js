@@ -109,6 +109,12 @@ export const getPredictions = async (keywordList = []) => {
   return response.data
 }
 
+// 6b. 获取全局热点预测 (GET)
+export const getGlobalTrends = async () => {
+  const response = await axios.get(`${API_URL}/prediction/trends`)
+  return response.data
+}
+
 // 7. 生成智能大纲 (POST) - OpenRouter/Gemini，根据话题+角度生成 structure
 export const generateOutline = async (title, angle, context) => {
   const topic = context || title
@@ -120,11 +126,13 @@ export const generateOutline = async (title, angle, context) => {
 }
 
 // 8. 生成全文 (POST)
-export const generateArticle = async (title, outline, context) => {
+// 8. 生成全文 (POST)
+export const generateArticle = async (title, outline, context, selection_id = null) => {
   const response = await axios.post(`${API_URL}/generate_article`, {
     title,
     outline,
-    context
+    context,
+    selection_id
   })
   return response.data
 }
@@ -289,4 +297,65 @@ export const generateCover = async (title, content) => {
 export const parseTopic = async (text) => {
   const response = await axios.post(`${API_URL}/ai/topic/smart-parse`, { text })
   return response.data;
+}
+
+// === 我的选题管理 ===
+
+// 30. 添加选题
+export const addSelection = async (data) => {
+  // data: { topic, source, hotspot_id }
+  const response = await axios.post(`${API_URL}/selections/add`, data);
+  return response.data;
+}
+
+// 31. 获取选题列表
+export const getSelections = async (data) => {
+  // data: { page, page_size, status }
+  const response = await axios.post(`${API_URL}/selections/list`, data);
+  return response.data;
+}
+
+// 32. 更新选题状态
+export const updateSelectionStatus = async (id, status) => {
+  const response = await axios.post(`${API_URL}/selections/update_status`, { id, status });
+  return response.data;
+}
+
+// 33. 删除选题
+export const deleteSelection = async (id) => {
+  const response = await axios.post(`${API_URL}/selections/delete`, { id });
+  return response.data;
+}
+
+// === Agent 管理 ===
+
+// 34. 获取 Agent 列表
+export const getAgents = async () => {
+  const response = await axios.get(`${API_URL}/agents/list`)
+  return response.data
+}
+
+// 35. 创建 Agent
+export const createAgent = async (data) => {
+  // data: { name, angle, prompt }
+  const response = await axios.post(`${API_URL}/agents/create`, data)
+  return response.data
+}
+
+// 36. 删除 Agent
+export const deleteAgent = async (id) => {
+  const response = await axios.post(`${API_URL}/agents/delete`, { agent_id: id })
+  return response.data
+}
+
+// 36.1 更新 Agent
+export const updateAgent = async (data) => {
+  const response = await axios.post(`${API_URL}/agents/update`, data)
+  return response.data
+}
+
+// 37. 运行 Agent
+export const runAgent = async (id) => {
+  const response = await axios.post(`${API_URL}/agents/run`, { agent_id: id })
+  return response.data
 }

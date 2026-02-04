@@ -53,6 +53,8 @@
         <span class="alert-badge" v-if="topicAlertCount > 0">{{ topicAlertCount > 9 ? '9+' : topicAlertCount }}</span>
       </div>
 
+
+
       <!-- 3. 我的创作 -->
       <div class="nav-group-title" style="margin-top: 24px;">我的创作</div>
 
@@ -62,6 +64,14 @@
         @click="$emit('change', 'editor')"
       >
         <span class="icon">✍️</span> 创作
+      </div>
+
+      <div 
+        class="nav-item" 
+        :class="{ active: currentTab === 'selections' }"
+        @click="$emit('change', 'selections')"
+      >
+        <span class="icon">📌</span> 我的选题
       </div>
 
       <div 
@@ -89,6 +99,14 @@
         @click="$emit('change', 'content_library')"
       >
         <span class="icon">🌐</span> 全网内容库
+      </div>
+
+      <div 
+        class="nav-item" 
+        :class="{ active: currentTab === 'agent_manager' }"
+        @click="$emit('change', 'agent_manager')"
+      >
+        <span class="icon">🤖</span> Agent 管理
       </div>
 
       <!-- 5. 系统管理 -->

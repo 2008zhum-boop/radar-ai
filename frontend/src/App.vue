@@ -41,6 +41,7 @@
               angle: '财经科技视角', 
               topic: instantDraftTopic || expandData?.topic || '',
               instruction: instantDraftInstruction,
+              selectionId: instantDraftSelectionId,
               polishData: polishData,
               expandData: expandData
           }"
@@ -52,6 +53,10 @@
 
       <div v-else-if="currentTab === 'works'" class="page-view">
         <ArticleManager @edit="handleEditArticle" />
+      </div>
+
+      <div v-else-if="currentTab === 'selections'" class="page-view">
+        <SelectionManager @start-draft="handleStartDraftFromSelection" />
       </div>
 
       <div v-else-if="currentTab === 'my_dashboard'" class="page-view">
@@ -69,6 +74,10 @@
 
       <div v-else-if="currentTab === 'topic_monitor'" class="page-view">
         <TopicMonitor />
+      </div>
+
+      <div v-else-if="currentTab === 'agent_manager'" class="page-view">
+        <AgentManager />
       </div>
 
       <div v-else-if="currentTab === 'customer'" class="page-view">
@@ -119,7 +128,9 @@ import ClientManager from './components/ClientManager.vue'
 import GlobalContentLibrary from './components/GlobalContentLibrary.vue'
 import UserManager from './components/UserManager.vue'
 import ArticleManager from './components/ArticleManager.vue'
+import SelectionManager from './components/SelectionManager.vue'
 import ReportModal from './components/ReportModal.vue'
+import AgentManager from './components/AgentManager.vue'
 import Login from './views/Login.vue'
 import Register from './views/Register.vue'
 import { getProfile } from './services/api'
@@ -133,6 +144,7 @@ const userProfile = ref(null)
 const currentTab = ref('hotlist')
 const instantDraftTopic = ref('')  // 从热点页「极速成稿」传入的话题
 const instantDraftInstruction = ref('')
+const instantDraftSelectionId = ref(null) // 从选题页「极速成稿」传入的ID
 const editingArticleId = ref(null) // 编辑已有文章ID
 const showReportModal = ref(false)
 const reportData = ref(null)
@@ -151,6 +163,7 @@ function handleStartInstantDraft(payload) {
       instantDraftInstruction.value = ''
   }
   
+  instantDraftSelectionId.value = null // Reset selection id when starting from hotspot
   editingArticleId.value = null
   editorMode.value = 'create'
   polishData.value = null
@@ -177,6 +190,16 @@ function handleStartExpand(data) {
     editorMode.value = 'expand'
     instantDraftTopic.value = data.topic // Helper for title
     editingArticleId.value = null
+    currentTab.value = 'editor'
+}
+
+function handleStartDraftFromSelection(item) {
+    instantDraftTopic.value = item.topic
+    instantDraftInstruction.value = ''
+    instantDraftSelectionId.value = item.id
+    editorMode.value = 'create'
+    editingArticleId.value = null
+    polishData.value = null
     currentTab.value = 'editor'
 }
 
