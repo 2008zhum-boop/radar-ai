@@ -1,20 +1,19 @@
 <template>
   <nav class="sidebar">
     <div class="logo-area">
-      <img src="https://www.tmtpost.com/syspanel/uploads/images/2026/02/20260202014306230.png" class="logo-img" alt="Logo" />
+      <img src="https://images.tmtpost.com/uploads/images/zhaopian/nuxtpic/logo_home.svg" class="logo-img" alt="Logo" />
       <h1 class="logo-text">钛媒体·智编</h1>
     </div>
 
     <div class="nav-menu">
       
       <!-- 1. 我的看板 -->
-      <div class="nav-group-title" style="margin-top: 12px;">我的看板</div>
       <div 
         class="nav-item" 
         :class="{ active: currentTab === 'my_dashboard' }"
         @click="$emit('change', 'my_dashboard')"
       >
-        <span class="icon">💻</span> 看板概览
+        <span class="icon">💻</span> 我的看板
       </div>
 
       <!-- 2. 舆情管理 -->
@@ -25,7 +24,7 @@
         :class="{ active: currentTab === 'hotlist' }"
         @click="$emit('change', 'hotlist')"
       >
-        <span class="icon">🔥</span> 今日热点
+        <span class="icon">🔥</span> 今日热榜
       </div>
 
       <div 
@@ -53,36 +52,66 @@
         <span class="alert-badge" v-if="topicAlertCount > 0">{{ topicAlertCount > 9 ? '9+' : topicAlertCount }}</span>
       </div>
 
+      <div 
+        class="nav-item" 
+        :class="{ active: currentTab === 'flash_monitor' }"
+        @click="$emit('change', 'flash_monitor')"
+      >
+        <span class="icon">⚡</span> 快报监控
+      </div>
 
+      <div 
+        class="nav-item" 
+        :class="{ active: currentTab === 'reports_center' }"
+        @click="$emit('change', 'reports_center')"
+      >
+        <span class="icon">📑</span> 报告中心
+      </div>
 
       <!-- 3. 我的创作 -->
       <div class="nav-group-title" style="margin-top: 24px;">我的创作</div>
 
       <div 
         class="nav-item" 
-        :class="{ active: currentTab === 'editor' }"
-        @click="$emit('change', 'editor')"
+        :class="{ active: currentTab === 'my_selections' }"
+        @click="$emit('change', 'my_selections')"
       >
-        <span class="icon">✍️</span> 创作
+        <span class="icon">✍️</span> 创作(选题)
       </div>
 
       <div 
         class="nav-item" 
-        :class="{ active: currentTab === 'selections' }"
-        @click="$emit('change', 'selections')"
+        :class="{ active: currentTab === 'article_manager' }"
+        @click="$emit('change', 'article_manager')"
       >
-        <span class="icon">📌</span> 我的选题
+        <span class="icon">📝</span> 文章管理
       </div>
 
       <div 
         class="nav-item" 
-        :class="{ active: currentTab === 'works' }"
-        @click="$emit('change', 'works')"
+        :class="{ active: currentTab === 'flash_manager' }"
+        @click="$emit('change', 'flash_manager')"
       >
-        <span class="icon">📂</span> 作品管理
+        <span class="icon">⚡</span> 快报管理
       </div>
 
-      <!-- 4. 知识管理 -->
+      <div 
+        class="nav-item" 
+        :class="{ active: currentTab === 'video_manager' }"
+        @click="$emit('change', 'video_manager')"
+      >
+        <span class="icon">🎬</span> 视频管理
+      </div>
+
+      <div 
+        class="nav-item" 
+        :class="{ active: currentTab === 'tag_manager' }"
+        @click="$emit('change', 'tag_manager')"
+      >
+        <span class="icon">🏷️</span> 标签管理
+      </div>
+
+      <!-- 3. 知识管理 -->
       <div class="nav-group-title" style="margin-top: 24px;">知识管理</div>
 
        <div 
@@ -95,21 +124,21 @@
       
       <div 
         class="nav-item" 
+        :class="{ active: currentTab === 'knowledge' }"
+        @click="$emit('change', 'knowledge')"
+      >
+        <span class="icon">📚</span> 客户知识库
+      </div>
+
+      <div 
+        class="nav-item" 
         :class="{ active: currentTab === 'content_library' }"
         @click="$emit('change', 'content_library')"
       >
         <span class="icon">🌐</span> 全网内容库
       </div>
 
-      <div 
-        class="nav-item" 
-        :class="{ active: currentTab === 'agent_manager' }"
-        @click="$emit('change', 'agent_manager')"
-      >
-        <span class="icon">🤖</span> Agent 管理
-      </div>
-
-      <!-- 5. 系统管理 -->
+      <!-- 4. 系统管理 -->
       <div class="nav-group-title" style="margin-top: 24px;" v-if="userRole === 'admin'">系统管理</div>
 
       <div 

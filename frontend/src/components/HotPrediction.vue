@@ -91,103 +91,94 @@
           <!-- Card Content -->
           <div class="card-inner">
               <!-- 1. Header: Alert + Title + Confidence -->
-              <div class="card-header">
-                 <div class="ch-main">
-                    <span class="alert-icon">{{ getAlertIcon(item.pred_score) }}</span>
-                    <span class="platform-icon" :class="getPlatform(item).class">{{ getPlatform(item).text }}</span>
-                    <a :href="item.url" target="_blank" class="topic-title">{{ item.title }}</a>
-                    <span class="read-dot" v-if="!item.isRead"></span>
-                 </div>
-                 <div class="ch-meta">
-                    <div class="confidence-badge" title="模型对该预测的确定性">
-                       <span class="cb-label">置信度:</span>
-                       <span class="cb-val high">High</span>
-                    </div>
-                    <div class="prob-text">
-                       🔥 {{ item.pred_score }}分 | 爆发概率 <strong>{{ Math.min(99, item.pred_score + 5) }}%</strong>
-                    </div>
-                 </div>
+                  <div class="card-header">
+                     <div class="ch-main">
+                        <span class="alert-icon">{{ getAlertIcon(item.pred_score) }}</span>
+                        <span class="platform-icon" :class="getPlatform(item).class">{{ getPlatform(item).text }}</span>
+                        <a :href="item.url" target="_blank" class="topic-title">{{ item.title }}</a>
+                        <span class="read-dot" v-if="!item.isRead"></span>
+                     </div>
+                     <div class="ch-meta">
+                        <div class="prob-text">
+                           🔥 {{ (item.current_heat / 10000).toFixed(1) }}w 热度 | {{ item.pred_score }}分
+                        </div>
+                     </div>
+                  </div>
+
+                  <!-- 2. Body: Radar + Metrics + Actionable Reasons -->
+                  <!-- 2. Body: Vertical Layout -->
+                  <div class="card-body">
+                     <!-- A. Latest News (Top) -->
+                     <div class="insight-section">
+                        <div class="is-row ai-insight">
+                           <span class="is-icon">💡</span>
+                           <span class="is-text full-text">{{ getSummaryText(item) }}</span>
+                        </div>
+                        
+                        <!-- Auto-Generated Topics Suggestions -->
+                        <div class="topic-suggestions" v-if="item.topics && item.topics.length">
+                           <div v-for="(t, idx) in item.topics" :key="idx" class="ts-item">
+                              <span class="ts-tag" :class="t.type === '快报' ? 'tag-quick' : 'tag-deep'">{{ t.type }}</span>
+                              <span class="ts-title">{{ t.title }}</span>
+                           </div>
+                        </div>
+                     </div>
+
+                     <!-- B. Data Row (Radar + Metrics) -->
+                     <div class="data-row">
+                         <!-- Radar Visual -->
+                         <!-- Emotion Bar Visual -->
+                         <div class="emotion-section">
+                            <div class="es-title">情感分布</div>
+                            <div class="emo-bar-container">
+                               <div class="emo-bar pos" :style="{width: item.emotion.pos + '%'}"></div>
+                               <div class="emo-bar neu" :style="{width: item.emotion.neu + '%'}"></div>
+                               <div class="emo-bar neg" :style="{width: item.emotion.neg + '%'}"></div>
+                            </div>
+                            <div class="emo-labels">
+                               <div class="el-item">😊 {{ item.emotion.pos }}%</div>
+                               <div class="el-item">😐 {{ item.emotion.neu }}%</div>
+                               <div class="el-item">😡 {{ item.emotion.neg }}%</div>
+                            </div>
+                         </div>
+
+                         <!-- Metrics (Trend) -->
+                         <div class="metrics-section">
+                            <div class="metric-row">
+                               <span class="m-label">🚀 增速趋势</span>
+                               <div class="sparkline">
+                                  <!-- Mock Sparkline -->
+                                  <svg width="60" height="20">
+                                     <polyline points="0,15 20,10 40,12 60,5" fill="none" class="sl-line" />
+                                  </svg>
+                                  <span class="sl-val text-red">↗ {{ formatAccel(item.acceleration) }}k/h</span>
+                               </div>
+                            </div>
+                         </div>
+                     </div>
+                  </div>
+
+                  <!-- 3. Action Footer -->
+                  <div class="card-footer">
+                     <div class="cf-actions">
+                        <button class="act-btn primary" @click="handleAction('flash', item)">
+                           ⚡️ 生成快报
+                        </button>
+                        <button class="act-btn secondary" @click="handleAction('draft', item)">
+                           📝 极速成稿
+                        </button>
+                        <button class="act-btn outline" @click="handleAction('add', item)">
+                           ➕ 加入选题
+                        </button>
+                        <button class="act-btn danger-text" @click="handleAction('remove', item)">
+                           ✕ 移除
+                        </button>
+                     </div>
+                  </div>
               </div>
-
-              <!-- 2. Body: Radar + Metrics + Actionable Reasons -->
-              <div class="card-body">
-                 <!-- Radar Visual -->
-                 <div class="radar-section">
-                    <svg viewBox="0 0 100 100" class="radar-svg">
-                       <polygon points="50,10 90,50 50,90 10,50" class="radar-bg" />
-                       <polygon :points="getRadarPoints(item)" class="radar-data" />
-                    </svg>
-                    <div class="radar-caption">情感驱动型</div>
-                 </div>
-
-                 <!-- Metrics & Golden Window -->
-                 <div class="metrics-section">
-                    <div class="metric-row">
-                       <span class="m-label">🚀 增速趋势</span>
-                       <div class="sparkline">
-                          <!-- Mock Sparkline -->
-                          <svg width="60" height="20">
-                             <polyline points="0,15 20,10 40,12 60,5" fill="none" class="sl-line" />
-                          </svg>
-                          <span class="sl-val text-red">↗ {{ formatAccel(item.acceleration) }}k/h</span>
-                       </div>
-                    </div>
-                    <div class="metric-row">
-                       <span class="m-label">⏳ 黄金窗口</span>
-                       <div class="gw-content">
-                          <span class="gw-time">{{ getGoldenWindow(item).time }}</span>
-                          <span class="gw-tip">{{ getGoldenWindow(item).tip }}</span>
-                       </div>
-                    </div>
-                 </div>
-
-                 <!-- Insight & Risk Pred (Conditional) -->
-                 <div class="insight-section">
-                    <div class="is-row ai-insight">
-                       <span class="is-icon">💡</span>
-                       <span class="is-text">{{ item.ai_reason || getMockInsight(item) }}</span>
-                    </div>
-                     <!-- Risk Evolution (Only for Red/Orange + Negative) -->
-                    <div class="is-row risk-evo" v-if="item.pred_score >= 70">
-                       <span class="is-icon">⚠️</span>
-                       <span class="is-text">风险演化：预计2h内负面占比 {{35 + (index*3)}}% ➔ {{55 + (index*2)}}%，可能引发次生舆情。</span>
-                    </div>
-                    <!-- Platform Spread (Mock) -->
-                    <div class="is-row spread">
-                       <span class="is-icon">🌊</span>
-                       <span class="is-text">扩散预测：抖音 (1.5h) ➔ 小红书 (3h)</span>
-                    </div>
-                 </div>
-                 
-                 <!-- Accuracy Tag (History) -->
-                 <div class="accuracy-tag" v-if="item.pred_score >= 80" title="过去30天同类预警准确率">
-                    🎯 历史准确率 89%
-                 </div>
-              </div>
-
-              <!-- 3. Action Footer -->
-              <div class="card-footer">
-                 <div class="cf-actions">
-                    <button class="act-btn primary" @click="handleAction('draft', item)">
-                       ⚡️ 极速成稿
-                    </button>
-                    <button class="act-btn secondary" @click="handleAction('topic', item)">
-                       📝 生成选题
-                    </button>
-                    <button class="act-btn danger" v-if="item.pred_score >= 80" @click="handleAction('risk', item)">
-                       🛡 风险应对
-                    </button>
-                    <button class="act-btn outline" @click="handleAction('monitor', item)">
-                       👀 监控
-                    </button>
-                 </div>
-              </div>
+            </div>
           </div>
         </div>
-      </div>
-    </div>
-    
-    <!-- Modal: Topic Generator -->
     <div v-if="showTopicModal" class="p-modal-overlay" @click.self="showTopicModal = false">
        <div class="p-modal">
           <div class="pm-header">
@@ -291,10 +282,16 @@ const currentItem = ref(null)
 const generatedTopics = ref([])
 
 // --- Data Fetching ---
-const fetchData = async () => {
+// --- Data Fetching ---
+const fetchData = async (force_refresh = false) => {
+    // Client-side cache check: if not forcing refresh and list already serves, skip
+    if (!force_refresh && list.value.length > 0) {
+        return
+    }
+
     loading.value = true
     try {
-        const res = await getGlobalTrends()
+        const res = await getGlobalTrends(force_refresh)
         const raw = res.data || []
         
         // Helper to get random category (excluding 'all')
@@ -312,8 +309,17 @@ const fetchData = async () => {
             probability: Math.min(99, (item.pred_score || 0) + 5),
             confidence: (item.pred_score > 80) ? 'High' : 'Mid',
             domain: getRandomCat(), // Assign random category
-            risk_trend: true
+            risk_trend: true,
+            emotion: {
+                pos: Math.floor(Math.random() * 60) + 20,
+                neu: Math.floor(Math.random() * 20),
+                neg: 0 // calc below
+            }
         }))
+        // Fix sum to 100
+        list.value.forEach(i => {
+            i.emotion.neg = 100 - i.emotion.pos - i.emotion.neu
+        })
         buildPulseChart()
     } catch (e) {
         console.error(e)
@@ -461,6 +467,15 @@ const getMockInsight = (item) => {
     return insights[item.title.length % insights.length]
 }
 
+const getSummaryText = (item) => {
+    if (!item) return ''
+    if (item.summary_fact) return item.summary_fact
+    if (item.raw_summary_context) return item.raw_summary_context
+    if (item.summary && typeof item.summary === 'object' && item.summary.fact) return item.summary.fact
+    if (typeof item.summary === 'string' && item.summary.trim()) return item.summary.trim()
+    return item.ai_reason || getMockInsight(item)
+}
+
 // --- Selection ---
 const toggleSelection = (id) => {
     if (selectedIds.value.has(id)) selectedIds.value.delete(id)
@@ -478,23 +493,25 @@ const handleBatch = (type) => {
 }
 
 // --- Actions ---
+// --- Actions ---
 const handleAction = (type, item) => {
     currentItem.value = item
-    if (type === 'draft') {
+    if (type === 'flash') {
+         // 生成快报
+         alert(`已为您生成 "${item.title}" 的新闻快报，请查收！`)
+    } else if (type === 'draft') {
         emit('start-instant-draft', item.title)
+    } else if (type === 'add') {
+         // 加入选题池
+         // We can assume first topic title or generic title
+         alert(`已将 "${item.title}" 加入您的选题库`)
+    } else if (type === 'remove') {
+        if(confirm('确定移除该预测热点吗？')) {
+            list.value = list.value.filter(i => i.id !== item.id)
+        }
     } else if (type === 'topic') {
-        // Mock Topics
-        generatedTopics.value = [
-            { type: '资讯速报', angle: '事实还原', title: `【速报】${item.title} 事件全梳理`, desc: '整合多方信源，梳理时间线' },
-            { type: '深度解析', angle: '行业视角', title: `透过 ${item.title} 看行业变局`, desc: '分析背后的资本博弈与影响' },
-            { type: '情感共鸣', angle: '用户情绪', title: `为什么说 ${item.title} 刺痛了我们？`, desc: '切入社会情绪，引发共鸣' }
-        ]
-        showTopicModal.value = true
-    } else if (type === 'risk') {
-        showRiskModal.value = true
-    } else if (type === 'monitor') {
-        alert("已添加到舆情监控列表")
-    }
+        // ... kept for fallback logic if needed, but UI button removed
+    } 
 }
 
 const submitTopic = (topic) => {
@@ -608,14 +625,24 @@ onMounted(() => fetchData())
 .prob-text strong { color: #dc2626; font-weight: 800; }
 
 /* Card Body */
-.card-body { padding: 16px; display: flex; gap: 16px; position: relative; }
-.radar-section { width: 70px; display: flex; flex-direction: column; align-items: center; flex-shrink: 0; gap: 4px; }
-.radar-svg { width: 70px; height: 70px; }
-.radar-bg { fill: #f8fafc; stroke: #e2e8f0; }
-.radar-data { fill: rgba(59,130,246,0.2); stroke: #3b82f6; stroke-width: 2; }
-.radar-caption { font-size: 10px; color: #94a3b8; }
+/* Card Body */
+.card-body { padding: 16px; display: flex; flex-direction: column; gap: 12px; position: relative; }
+.data-row { display: flex; gap: 24px; align-items: flex-start; }
 
-.metrics-section { flex: 1; display: flex; flex-direction: column; gap: 12px; }
+.emotion-section { flex: 2; display: flex; flex-direction: column; gap: 6px; }
+.es-title { font-size: 11px; color: #94a3b8; font-weight: 600; }
+.emo-bar-container { 
+    height: 8px; width: 100%; background: #f1f5f9; border-radius: 4px; overflow: hidden; display: flex; 
+}
+.emo-bar { height: 100%; transition: width 0.5s ease; }
+.emo-bar.pos { background: #22c55e; }
+.emo-bar.neu { background: #fbbf24; }
+.emo-bar.neg { background: #ef4444; }
+
+.emo-labels { display: flex; justify-content: space-between; font-size: 11px; color: #64748b; margin-top: 2px; }
+.el-item { display: flex; align-items: center; gap: 2px; }
+
+.metrics-section { flex: 1; display: flex; flex-direction: column; gap: 12px; justify-content: flex-start; padding-top: 18px; }
 .metric-row { display: flex; flex-direction: column; gap: 4px; }
 .m-label { font-size: 11px; color: #94a3b8; }
 .sparkline { display: flex; align-items: center; gap: 6px; }
@@ -625,47 +652,38 @@ onMounted(() => fetchData())
 .gw-time { font-size: 14px; font-weight: 800; color: #ea580c; }
 .gw-tip { font-size: 11px; color: #64748b; }
 
-.insight-section { width: 180px; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; background: #f8fafc; padding: 10px; border-radius: 8px; }
-.is-row { display: flex; gap: 6px; font-size: 11px; line-height: 1.4; color: #475569; }
-.is-icon { font-size: 12px; }
-.is-text { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.insight-section { width: 100%; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; background: #f8fafc; padding: 10px; border-radius: 8px; }
+.is-row { display: flex; gap: 6px; font-size: 11px; line-height: 1.5; color: #475569; }
+.is-icon { font-size: 12px; margin-top: 2px; }
+.is-text { word-break: break-all; }
+.is-text.full-text { -webkit-line-clamp: unset; overflow: visible; display: block; }
 .risk-evo { color: #b91c1c; background: #fef2f2; padding: 4px; border-radius: 4px; }
-.accuracy-tag { position: absolute; bottom: 16px; right: 210px; font-size: 10px; color: #2563eb; background: #eff6ff; padding: 2px 6px; border-radius: 4px; }
+.accuracy-tag { display: none; }
+
+/* Topic Suggestions */
+.topic-suggestions { margin-top: 12px; padding-top: 12px; border-top: 1px dashed #e2e8f0; display: flex; flex-direction: column; gap: 8px; }
+.ts-item { 
+    display: flex; gap: 8px; align-items: center; font-size: 12px; padding: 6px 10px; background: white; border: 1px solid #f1f5f9; border-radius: 6px; cursor: pointer; transition: all 0.2s;
+}
+.ts-item:hover { border-color: #cbd5e1; transform: translateX(2px); box-shadow: 0 2px 5px rgba(0,0,0,0.03); }
+.ts-tag { padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 10px; color: white; white-space: nowrap; flex-shrink: 0; display: flex; align-items: center; height: 18px; }
+.tag-quick { background: #3b82f6; } 
+.tag-deep { background: #8b5cf6; } 
+.ts-title { color: #334155; font-weight: 500; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 
 /* Footer */
-.card-footer { padding: 10px 16px; border-top: 1px solid #f1f5f9; background: #fafafa; display: flex; justify-content: flex-end; }
-.cf-actions { display: flex; gap: 8px; }
-.act-btn { border: none; padding: 6px 12px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
-.act-btn:hover { transform: translateY(-1px); }
-.act-btn.primary { background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; box-shadow: 0 2px 6px rgba(37,99,235,0.3); }
+.card-footer { padding: 12px 16px; border-top: 1px solid #f1f5f9; background: transparent; display: flex; justify-content: flex-start; }
+.cf-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; width: 100%; }
+.act-btn { 
+    border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 4px; min-width: 0;
+}
+.act-btn:hover { transform: translateY(-1px); filter: brightness(1.05); }
+.act-btn.primary { background: linear-gradient(135deg, #2563eb, #1d4ed8); color: white; box-shadow: 0 4px 10px rgba(37,99,235,0.2); }
 .act-btn.secondary { background: #fff7ed; color: #ea580c; border: 1px solid #ffedd5; }
-.act-btn.danger { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
-.act-btn.outline { background: white; border: 1px solid #e2e8f0; color: #64748b; }
-
-/* Modals */
-.p-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1000; display: flex; justify-content: center; align-items: center; backdrop-filter: blur(2px); }
-.p-modal { background: white; width: 500px; border-radius: 12px; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.2); animation: fadeIn 0.2s; }
-.p-modal.risk { width: 600px; }
-@keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
-
-.pm-header { padding: 16px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; background: #f8fafc; }
-.pm-header h3 { margin: 0; font-size: 16px; color: #1e293b; }
-.pm-header.risk { background: #fff1f2; }
-.pm-header.risk h3 { color: #991b1b; }
-.pm-close { border: none; background: none; font-size: 20px; cursor: pointer; color: #64748b; }
-
-.pm-body { padding: 24px; max-height: 70vh; overflow-y: auto; }
-.pm-source-title { font-size: 13px; color: #64748b; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px dashed #e2e8f0; }
-
-.topic-option { border: 1px solid #e2e8f0; padding: 16px; border-radius: 8px; margin-bottom: 12px; transition: all 0.2s; }
-.topic-option:hover { border-color: #3b82f6; background: #f0f9ff; }
-.to-head { display: flex; justify-content: space-between; margin-bottom: 8px; }
-.to-tag { font-size: 11px; background: #dbeafe; color: #1e40af; padding: 2px 8px; border-radius: 10px; font-weight: 700; }
-.to-angle { font-size: 12px; color: #64748b; }
-.to-title { font-size: 15px; font-weight: 700; color: #1e293b; margin-bottom: 4px; }
-.to-desc { font-size: 12px; color: #64748b; margin-bottom: 12px; }
-.to-add-btn { width: 100%; border: 1px dashed #3b82f6; background: white; color: #3b82f6; padding: 8px; border-radius: 6px; cursor: pointer; font-weight: 600; }
-.to-add-btn:hover { background: #3b82f6; color: white; }
+.act-btn.outline { background: white; border: 1px solid #e2e8f0; color: #475569; }
+.act-btn.outline:hover { border-color: #cbd5e1; color: #1e293b; }
+.act-btn.danger-text { background: transparent; color: #94a3b8; border: none; padding: 6px 8px; margin-left: 4px; font-weight: 500; }
+.act-btn.danger-text:hover { color: #fe8787; background: #fff; }
 
 .risk-section { margin-bottom: 24px; }
 .risk-section h4 { font-size: 14px; margin: 0 0 10px 0; color: #1e293b; border-left: 3px solid #dc2626; padding-left: 8px; }

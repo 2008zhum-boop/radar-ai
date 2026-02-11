@@ -8,7 +8,6 @@
   <!-- 主应用界面 -->
   <div v-else class="app-container">
     <SidebarNav 
-      v-if="currentTab !== 'editor'"
       :currentTab="currentTab" 
       :userRole="userProfile?.role" 
       :username="userProfile?.username"
@@ -27,45 +26,19 @@
       <!-- 内容区域 -->
       <!-- HotList 使用 v-show 保持存活，避免切换Tab时重载 -->
       <div v-show="currentTab === 'hotlist'" class="page-view">
-        <HotList @start-instant-draft="handleStartInstantDraft" />
+        <HotList />
       </div>
 
       <div v-if="currentTab === 'prediction'" class="page-view">
-        <HotPrediction @start-instant-draft="handleStartInstantDraft" />
+        <HotPrediction />
       </div>
 
       <div v-else-if="currentTab === 'editor'" class="page-view">
-        <EditorView
-          :initial-data="{ 
-              title: instantDraftTopic || expandData?.topic || '未命名选题', 
-              angle: '财经科技视角', 
-              topic: instantDraftTopic || expandData?.topic || '',
-              instruction: instantDraftInstruction,
-              selectionId: instantDraftSelectionId,
-              polishData: polishData,
-              expandData: expandData
-          }"
-          :article-id="editingArticleId"
-          :mode="editorMode"
-          @back="currentTab = 'my_dashboard'"
-        />
-      </div>
-
-      <div v-else-if="currentTab === 'works'" class="page-view">
-        <ArticleManager @edit="handleEditArticle" />
-      </div>
-
-      <div v-else-if="currentTab === 'selections'" class="page-view">
-        <SelectionManager @start-draft="handleStartDraftFromSelection" />
+        <SmartEditor />
       </div>
 
       <div v-else-if="currentTab === 'my_dashboard'" class="page-view">
-        <MonitorDashboard 
-            :mode="'global'" 
-            @start-polish="handleStartPolish" 
-            @start-expand="handleStartExpand" 
-            @start-create="handleStartInstantDraft"
-        />
+        <MonitorDashboard :mode="'global'" />
       </div>
 
       <div v-else-if="currentTab === 'monitor'" class="page-view">
@@ -76,8 +49,8 @@
         <TopicMonitor />
       </div>
 
-      <div v-else-if="currentTab === 'agent_manager'" class="page-view">
-        <AgentManager />
+      <div v-else-if="currentTab === 'flash_monitor'" class="page-view">
+        <FlashNewsMonitor />
       </div>
 
       <div v-else-if="currentTab === 'customer'" class="page-view">
@@ -102,6 +75,46 @@
         <GlobalContentLibrary />
       </div>
 
+      <!-- My Creations -->
+      <div v-else-if="currentTab === 'my_selections'" class="page-view">
+        <SelectionManager />
+      </div>
+
+      <div v-else-if="currentTab === 'article_manager'" class="page-view">
+         <ArticleManager />
+      </div>
+
+      <div v-else-if="currentTab === 'flash_manager'" class="page-view">
+         <!-- Reuse Monitor UI for Management -->
+         <FlashNewsMonitor />
+      </div>
+
+      <div v-else-if="currentTab === 'video_manager'" class="page-view">
+         <VideoManager />
+      </div>
+
+      <div v-else-if="currentTab === 'tag_manager'" class="page-view">
+         <TagManager />
+      </div>
+
+      <!-- Agent Manager (if needed somewhere else, or keep hidden/dev) -->
+      <div v-else-if="currentTab === 'agents'" class="page-view">
+         <AgentManager />
+      </div>
+
+      <div v-else-if="currentTab === 'reports_center'" class="page-view">
+        <div style="padding: 40px; text-align: center; color: #64748b;">
+            <h2>📑 报告中心</h2>
+            <p>全站舆情报告均将汇总于此 [开发中]</p>
+        </div>
+      </div>
+
+      <!-- Removed old 'knowledge' block as it seems replaced by content_library/agents/tags 
+           or user intends 'customer' to be distinct from 'knowledge'. 
+           User's list: 4. Knowledge Management (Customer, Content, Agent, Tag).
+           So 'knowledge' tab itself is probably gone/replaced.
+      -->
+      
       <div v-else-if="currentTab === 'users'" class="page-view">
         <UserManager />
       </div>
@@ -121,18 +134,21 @@ import { ref, onMounted, provide } from 'vue'
 import SidebarNav from './components/SidebarNav.vue'
 import HotList from './components/HotList.vue'
 import HotPrediction from './components/HotPrediction.vue'
-import EditorView from './components/EditorView.vue'
+import SmartEditor from './components/SmartEditor.vue'
 import MonitorDashboard from './components/MonitorDashboard.vue'
 import TopicMonitor from './components/TopicMonitor.vue'
 import ClientManager from './components/ClientManager.vue'
 import GlobalContentLibrary from './components/GlobalContentLibrary.vue'
 import UserManager from './components/UserManager.vue'
-import ArticleManager from './components/ArticleManager.vue'
-import SelectionManager from './components/SelectionManager.vue'
 import ReportModal from './components/ReportModal.vue'
-import AgentManager from './components/AgentManager.vue'
 import Login from './views/Login.vue'
 import Register from './views/Register.vue'
+import SelectionManager from './components/SelectionManager.vue'
+import ArticleManager from './components/ArticleManager.vue'
+import AgentManager from './components/AgentManager.vue'
+import TagManager from './components/TagManager.vue'
+import FlashNewsMonitor from './components/FlashNewsMonitor.vue'
+import VideoManager from './components/VideoManager.vue'
 import { getProfile } from './services/api'
 
 // Auth State
@@ -142,66 +158,9 @@ const userProfile = ref(null)
 
 // App State
 const currentTab = ref('hotlist')
-const instantDraftTopic = ref('')  // 从热点页「极速成稿」传入的话题
-const instantDraftInstruction = ref('')
-const instantDraftSelectionId = ref(null) // 从选题页「极速成稿」传入的ID
-const editingArticleId = ref(null) // 编辑已有文章ID
 const showReportModal = ref(false)
 const reportData = ref(null)
 const topicAlertCount = ref(2) // 专题监控未读预警数量
-
-const polishData = ref(null) // 润色文件的初始数据
-const expandData = ref(null) // 扩写数据的初始数据
-const editorMode = ref('create') // 'create' | 'polish' | 'expand'
-
-function handleStartInstantDraft(payload) {
-  if (typeof payload === 'object' && payload !== null) {
-      instantDraftTopic.value = payload.topic || ''
-      instantDraftInstruction.value = payload.instruction || ''
-  } else {
-      instantDraftTopic.value = payload || ''
-      instantDraftInstruction.value = ''
-  }
-  
-  instantDraftSelectionId.value = null // Reset selection id when starting from hotspot
-  editingArticleId.value = null
-  editorMode.value = 'create'
-  polishData.value = null
-  currentTab.value = 'editor'
-}
-
-function handleEditArticle(id) {
-    editingArticleId.value = id
-    editorMode.value = 'create' // Editing is similar to create flow but skipping step 1
-    currentTab.value = 'editor'
-}
-
-function handleStartPolish(data) {
-    // data = { title, summary, content }
-    polishData.value = data
-    editorMode.value = 'polish'
-    editingArticleId.value = null
-    currentTab.value = 'editor'
-}
-
-function handleStartExpand(data) {
-    // data = { topic, outline, context }
-    expandData.value = data
-    editorMode.value = 'expand'
-    instantDraftTopic.value = data.topic // Helper for title
-    editingArticleId.value = null
-    currentTab.value = 'editor'
-}
-
-function handleStartDraftFromSelection(item) {
-    instantDraftTopic.value = item.topic
-    instantDraftInstruction.value = ''
-    instantDraftSelectionId.value = item.id
-    editorMode.value = 'create'
-    editingArticleId.value = null
-    polishData.value = null
-    currentTab.value = 'editor'
-}
 
 // Check Auth on Load
 onMounted(async () => {

@@ -15,7 +15,20 @@
       <div class="summary-header">
         <span class="ai-icon">✨ AI 提炼</span>
       </div>
+      
       <p class="summary-text">{{ summary }}</p>
+
+      <div v-if="emotions" class="emotion-tags">
+        <span 
+          v-for="(score, key) in emotions" 
+          :key="key"
+          v-show="score > 20" 
+          class="emotion-tag"
+          :class="key"
+        >
+          {{ getEmotionLabel(key) }} {{ score }}%
+        </span>
+      </div>
       
       <div class="action-row">
         <button class="action-btn analyze" @click.stop="$emit('analyze')">
@@ -39,12 +52,27 @@ const props = defineProps({
   heat: [Number, String],
   label: String,
   summary: String,
-  category: String, // 新增接收分类
-  url: String       // 新增接收链接
+  category: String,
+  url: String,
+  emotions: Object // ✅ 新增：接收情绪数据对象
 })
 
 defineEmits(['analyze'])
 
+// === 情绪标签配置 ===
+const emotionConfig = {
+  anxiety:    { label: '😰 焦虑', class: 'anxiety' },
+  anger:      { label: '😡 愤怒', class: 'anger' },
+  sadness:    { label: '😭 悲伤', class: 'sadness' },
+  excitement: { label: '🎉 兴奋', class: 'excitement' },
+  sarcasm:    { label: '😏 嘲讽', class: 'sarcasm' }
+};
+
+const getEmotionLabel = (key) => {
+  return emotionConfig[key]?.label || key;
+};
+
+// === 样式计算 ===
 const rankClass = computed(() => {
   if (props.rank === 1) return 'rank-1'
   if (props.rank === 2) return 'rank-2'
@@ -73,7 +101,7 @@ const openLink = () => {
   padding: 16px;
   border: 1px solid #e2e8f0;
   transition: all 0.2s ease;
-  cursor: pointer; /* 鼠标变手型 */
+  cursor: pointer;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -146,7 +174,7 @@ const openLink = () => {
   font-weight: 500;
 }
 
-/* AI 摘要区域 (核心修改) */
+/* AI 摘要区域 */
 .ai-summary-box {
   background: #f8fafc;
   border-radius: 8px;
@@ -172,10 +200,62 @@ const openLink = () => {
 .summary-text {
   margin: 0;
   font-size: 13px;
-  line-height: 1.8; /* 增加行高，更易阅读 */
+  line-height: 1.6;
   color: #475569;
   text-align: justify;
-  /* 移除 line-clamp，显示全文 */
+}
+
+/* 🔥 新增：情绪标签样式 */
+.emotion-tags {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.emotion-tag {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid transparent; /* 默认边框 */
+}
+
+/* 焦虑：橙色系 */
+.emotion-tag.anxiety {
+  background-color: #fff7e6;
+  color: #fa8c16;
+  border-color: #ffd591;
+}
+
+/* 愤怒：红色系 */
+.emotion-tag.anger {
+  background-color: #fff1f0;
+  color: #f5222d;
+  border-color: #ffa39e;
+}
+
+/* 悲伤：蓝灰色系 */
+.emotion-tag.sadness {
+  background-color: #f0f5ff;
+  color: #2f54eb;
+  border-color: #adc6ff;
+}
+
+/* 兴奋：绿色系 */
+.emotion-tag.excitement {
+  background-color: #f6ffed;
+  color: #52c41a;
+  border-color: #b7eb8f;
+}
+
+/* 嘲讽：紫色系 */
+.emotion-tag.sarcasm {
+  background-color: #f9f0ff;
+  color: #722ed1;
+  border-color: #d3adf7;
 }
 
 /* 底部操作栏 */

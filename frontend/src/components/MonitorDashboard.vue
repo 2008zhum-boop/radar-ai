@@ -12,7 +12,7 @@
     <!-- Global Loading Overlay for Polish -->
     <div v-if="isPolishing" class="polish-loading-overlay">
         <div class="spinner-lg"></div>
-        <p>正在深度润色文档，请稍候...</p>
+        <p>正在生成标准稿件，请稍候...</p>
         <button class="pol-cancel-btn" @click="isPolishing = false">取消</button>
     </div>
 
@@ -211,8 +211,8 @@
                        <div class="wb-card action-polish" @click="handleQuickAction('polish')">
                            <div class="wb-icon-box">🎨</div>
                            <div class="wb-info">
-                               <div class="wb-label">智能润色</div>
-                               <div class="wb-desc">优化文章语气、修正错别字、提升可读性</div>
+                               <div class="wb-label">标准稿件写作</div>
+                               <div class="wb-desc">深度优化文章结构与表达，生成标准媒体稿件</div>
                            </div>
                            <div class="wb-arrow">→</div>
                        </div>
@@ -278,7 +278,7 @@
                        <!-- Left: Trend Chart -->
                        <div class="chart-wrapper wide">
                            <div class="cw-header">
-                               <span class="icon">📈</span> 小时级热度趋势
+                               <span class="icon">📈</span> 7日热度趋势
                            </div>
                            <div class="cw-body">
                                <v-chart class="chart-full" :option="trendOption" autoresize />
@@ -467,7 +467,7 @@
     <!-- 润色配置弹窗 -->
     <div v-if="showPolishModal" class="config-modal-overlay" @click.self="showPolishModal = false">
       <div class="config-modal polish-config">
-        <h3>🎨 智能润色配置</h3>
+        <h3>🎨 标准稿件写作配置</h3>
         
         <div class="pc-section">
             <label>已选素材</label>
@@ -479,18 +479,18 @@
         </div>
 
         <div class="pc-section">
-            <label>润色指令 (Prompt)</label>
+            <label>写作指令 (Prompt)</label>
             <textarea 
                 v-model="polishData.instruction" 
                 class="prompt-editor"
                 rows="6"
             ></textarea>
-            <p class="hint">您可以修改上方指令，调整AI的润色风格和重点。</p>
+            <p class="hint">您可以修改上方指令，调整AI的写作风格和重点。</p>
         </div>
 
         <div class="pc-actions">
             <button class="cancel-btn" @click="showPolishModal = false">取消</button>
-            <button class="confirm-btn" @click="confirmPolish">开始润色</button>
+            <button class="confirm-btn" @click="confirmPolish">开始写作</button>
         </div>
       </div>
     </div>
@@ -759,7 +759,58 @@ const handleChatCreate = async () => {
 const polishData = ref({ 
     file: null, 
     content: '', 
-    instruction: `我是资深科技财经媒体编辑，我将提炼素材核心要点，优化文章的钛媒体专业调性、补充素材中提到的观点细节等。贴合钛媒体科技产业深度、犀利洞察、专业精炼的核心调性，优化语文表达，强化产业视角，同时保留原文逻辑，让文章更具科技媒体的专业质感与传播力。字数2000字左右。` 
+    instruction: `**## 角色定义**
+你是一名聚焦中美科技公司IPO上市报道（芯片、AI、光通信、云计算等）的**彭博社资深财经驻站记者**。你拥有20年以上资本市场报道经验，不仅能拆解招股书数据，更能洞察数据背后的行业博弈与权力结构。你的语言风格：**冷峻、犀利、穿透力强**。
+
+**## 核心撰写原则（拒绝AI味）**
+
+1. **反公式化叙事：** 禁止使用“首先、其次、综上所述”等低级连接词。采用**背景嵌入式**或**逻辑驱动式**过渡。每段话的开头要像“钩子”一样吸引投资者，而非机械陈述。
+2. **拒绝“平衡废话”：** 资深记者不玩“一方面、另一方面”的文字游戏。请基于事实给出**确定性的行业研判**。如果存在风险，直接指出其对市值的杀伤力；如果定价过高，直接拆解其溢价背后的虚火。
+3. **引入“资深编辑视角”：** 在描述客观事实时，适时加入**“观察家评论”**。例如：“资深观察者认为，这种关联交易本质上是……”、“从资本底色来看，这种撤退动作释放了……”等。
+4. **语感去油：** 杜绝“双刃剑”、“里程碑”、“展望未来”等AI高频成语。多使用**专业金融动词**（如：对冲、锚定、稀释、博弈、承压、回撤、估值倒挂）。
+
+**## 核心撰写要求（5W1H+IPO专项）**
+
+* **核心要素：** 覆盖发行主体、定价区间、募资规模、财务合规性（营收/利润/现金流）、基石投资者阵容。
+* **监管视角：** 结合上市地（如港股、科创板）最新规则，分析企业合规性与估值合理性。
+* **资本结构：** 深度挖掘股东背景（特别是大股东减持套现等敏感点）及其对市场信心的影响。
+
+**## 格式规范（严格执行）**
+
+1. **无标题模式：** 全文禁止出现任何小标题（加粗标题、序号标题、分点说明）。
+2. **纯段落呈现：** 全程以连续段落呈现，仅使用 HTML 标签 <p> 分段，使用 <strong> 强调核心数据或关键结论。
+3. **严禁英文：** 全文除股票代码（如 09611.HK）外，严禁出现英文。
+
+
+##内容要求
+你还有什么问题、您是否需要我为您分析、您要不要我帮您分析、我可以继续分析
+以上这些句子不要出现在撰写的内容中
+
+**## 结尾专项要求**
+
+* **行业与竞对动态：** 补充行业趋势（如AI PC渗透率）及主要竞对（如华勤、闻泰）的最新动作，形成完整的竞争图谱。
+* **高价值下一步：** 结尾以“您是否需要我为您分析……”的形式，提供一个针对财务深度拆解或行业竞争格局的后续调研方向。
+
+**## 必须遵循的文章结构（JSON框架）**
+
+\`\`\`json
+{
+    "写作框架": {
+        "标题设计": "核心主体+关键点/矛盾点+主题定位",
+        "开篇总起": { "核心要素": "定价/挂牌事件", "主体背景": "行业地位", "核心矛盾": "风险或质疑点", "点题": "资本意义" },
+        "主体章节布局": [
+            { "章节主题": "资本历程回溯", "核心内容": "早期融资、大股东动向、A+H路径" },
+            { "章节主题": "潜在风险暴露", "核心内容": "大股东减持、毛利承压、技术迭代风险" },
+            { "章节主题": "关联关系剖析", "核心内容": "核心客户依赖、股权独立性质疑" },
+            { "章节主题": "业务本质与行业定位", "核心内容": "AI终端转型、募投项目实效性" },
+            { "章节主题": "财务深度解读", "核心内容": "营收与利润背离分析、现金流质量" }
+        ],
+        "结尾收尾": { "总结": "核心矛盾", "提示": "未来不确定性", "启示": "投资者建议" }
+    }
+}
+\`\`\`
+ 
+请基于以上框架与风格要求，结合以下素材撰写新闻：` 
 })
 const expandData = ref({
     topic: '',
@@ -830,7 +881,7 @@ const confirmPolish = async () => {
         }
     } catch (e) {
         console.error("Polishing failed:", e)
-        alert('润色失败，请重试')
+        alert('写作失败，请重试')
     } finally {
         isPolishing.value = false
         polishData.value.file = null
@@ -1411,33 +1462,6 @@ onMounted(async () => {
 .gdb-divider { width: 1px; height: 30px; background: #e2e8f0; }
 
 .client-grid-wall { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 20px; }
-.client-card-large { background: white; border-radius: 12px; border: 1px solid #e2e8f0; padding: 20px; cursor: pointer; transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.03); position: relative; display: flex; flex-direction: column; gap: 16px; }
-.client-card-large:hover { transform: translateY(-2px); box-shadow: 0 8px 16px -4px rgba(0,0,0,0.05); }
-.client-card-large.active { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1); }
-
-.card-head { display: flex; justify-content: space-between; align-items: flex-start; }
-.head-main { display: flex; flex-direction: column; gap: 4px; }
-.name { font-size: 18px; font-weight: 700; color: #1e293b; }
-.industry-tag { display: inline-block; background: #f1f5f9; color: #475569; padding: 2px 8px; border-radius: 4px; font-size: 11px; align-self: flex-start; }
-.status-badge { padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: 600; }
-.status-badge.safe { background: #d1fae5; color: #059669; }
-.status-badge.off { background: #f1f5f9; color: #94a3b8; }
-.card-body { display: flex; gap: 20px; }
-.metric-group { flex: 1; }
-.metric-group.right { flex: 0 0 100px; }
-.metric-lbl { font-size: 11px; color: #94a3b8; margin-bottom: 8px; }
-.sentiment-bar { display: flex; height: 6px; border-radius: 3px; overflow: hidden; margin-bottom: 6px; }
-.seg.neg { background: #ef4444; } .seg.neu { background: #fcd34d; } .seg.pos { background: #10b981; }
-.legend-mini { display: flex; justify-content: space-between; font-size: 10px; color: #64748b; }
-.sparkline { display: flex; align-items: flex-end; height: 32px; gap: 3px; }
-.sparkline .bar { flex: 1; background: #60a5fa; border-radius: 2px; }
-.card-footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #f1f5f9; padding-top: 12px; }
-.risk-tags { display: flex; gap: 6px; align-items: center; font-size: 11px; }
-.risk-tags.empty { color: #10b981; }
-.rt-lbl { color: #94a3b8; }
-.risk-tag { color: #ef4444; border: 1px solid #fecaca; background: #fef2f2; padding: 1px 6px; border-radius: 4px; }
-.report-btn { background: #eff6ff; color: #2563eb; border: none; padding: 6px 12px; border-radius: 4px; font-size: 12px; cursor: pointer; font-weight: 500; }
-.report-btn:hover { background: #dbeafe; }
 
 /* === 右侧 Client Hub with Tabs === */
 .right-panel {
@@ -1750,40 +1774,99 @@ onMounted(async () => {
   overflow-y: auto;
 }
 
+/* Improved Client Card Styling */
 .client-card-large {
   background: white;
   border-radius: 12px;
   border: 1px solid #e2e8f0;
-  padding: 20px;
+  padding: 0;
   cursor: pointer;
-  transition: all 0.2s;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.03);
-  position: relative;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  overflow: hidden;
+  height: auto;
 }
 .client-card-large:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px -4px rgba(0,0,0,0.1); /* Enhanced shadow */
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px -6px rgba(0,0,0,0.15);
   border-color: #cbd5e1;
 }
 
-/* Simple stats in client card footer */
-.card-stats-simple {
-   display: flex;
-   align-items: center;
-   justify-content: space-between;
-   width: 100%;
-}
-.css-item {
+.card-head {
+  padding: 20px 20px 16px 20px;
   display: flex;
-  flex-direction: row;
-  align-items: baseline;
-  gap: 6px;
+  justify-content: space-between;
+  align-items: flex-start;
 }
-.css-item .lbl { font-size: 12px; color:#94a3b8; font-weight: normal; }
-.css-item .val { font-size: 14px; font-weight: 600; color:#334155; }
+.head-main { display: flex; flex-direction: column; gap: 6px; }
+.name { font-size: 18px; font-weight: 800; color: #1e293b; letter-spacing: -0.5px; }
+.industry-tag { 
+  align-self: flex-start;
+  padding: 2px 8px; 
+  background: #f1f5f9; 
+  color: #64748b; 
+  font-size: 12px; 
+  border-radius: 6px; 
+  font-weight: 500;
+}
+.status-badge {
+    font-size: 12px; 
+    padding: 4px 10px; 
+    border-radius: 6px; 
+    font-weight: 700;
+}
+.status-badge.safe { background: #dcfce7; color: #15803d; }
+.status-badge.risk { background: #fee2e2; color: #b91c1c; }
+.status-badge.off { background: #f1f5f9; color: #94a3b8; }
+
+.card-body {
+  padding: 0 20px 20px 20px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.metric-group { display: flex; flex-direction: column; gap: 8px; }
+.metric-lbl { font-size: 12px; color: #94a3b8; font-weight: 500; }
+
+.sentiment-bar {
+  display: flex; height: 10px; width: 100%; 
+  border-radius: 5px; overflow: hidden; background: #f1f5f9;
+  margin-top: 4px;
+}
+.seg { height: 100%; transition: width 0.3s ease; }
+.seg.neg { background: #ef4444; }
+.seg.neu { background: #f59e0b; }
+.seg.pos { background: #22c55e; }
+
+.legend-mini { 
+  display: flex; justify-content: space-between; font-size: 12px; color: #64748b; margin-top: 4px; 
+}
+
+.sparkline {
+  display: flex; align-items: flex-end; justify-content: space-between; 
+  height: 48px; gap: 3px; background: #f8fafc; border-radius: 6px; padding: 4px;
+}
+.bar { 
+  width: 100%; 
+  background: #cbd5e1; 
+  border-radius: 2px;
+  min-height: 2px; /* Ensure non-zero height even if 0 */
+  transition: all 0.3s;
+}
+.bar.active { background: #3b82f6; }
+
+.card-footer {
+  padding: 12px 16px;
+  background: #f8fafc;
+  border-top: 1px solid #f1f5f9;
+}
+.card-stats-simple { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.css-item { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.css-item .lbl { font-size: 11px; color:#94a3b8; text-transform: uppercase; font-weight: 600; }
+.css-item .val { font-size: 16px; font-weight: 800; color:#1e293b; font-family: 'DIN Alternate', sans-serif; }
 .css-item .val.red { color: #dc2626; }
  
 /* Tab Nav styling to match TopicMonitor .dv-tabs */
@@ -2180,12 +2263,13 @@ onMounted(async () => {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 20px 32px;
+    padding: 16px 32px;
     background: white;
-    box-shadow: 0 1px 0 #f1f5f9;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
     position: sticky;
     top: 0;
     z-index: 10;
+    margin-bottom: 20px;
 }
 .header-left { 
     display: flex; 
@@ -2193,18 +2277,20 @@ onMounted(async () => {
     gap: 16px; 
 }
 .header-left h3 { 
-    font-size: 20px; 
-    font-weight: 700; 
+    font-size: 22px; 
+    font-weight: 800; 
     color: #0f172a; 
     margin: 0; 
+    letter-spacing: -0.5px;
 }
 .status-badge-green {
     background: #ecfdf5;
     color: #059669;
-    padding: 4px 8px;
-    border-radius: 4px;
+    padding: 4px 10px;
+    border-radius: 6px;
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 700;
+    border: 1px solid #d1fae5;
 }
 
 .header-center {
@@ -2216,59 +2302,67 @@ onMounted(async () => {
     display: flex;
     background: #f1f5f9;
     padding: 4px;
-    border-radius: 8px;
+    border-radius: 10px;
     gap: 4px;
 }
 .nav-item {
-    padding: 6px 16px;
-    border-radius: 6px;
-    font-size: 13px;
+    padding: 8px 24px;
+    border-radius: 8px;
+    font-size: 14px;
     font-weight: 600;
     color: #64748b;
     cursor: pointer;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     transition: all 0.2s;
 }
 .nav-item.active {
     background: white;
     color: #0f172a;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
 }
-.nav-item .icon { font-size: 14px; }
+.nav-item .icon { font-size: 16px; }
 
 .header-actions {
     display: flex;
     gap: 12px;
 }
 .action-btn-gray {
-    background: #f1f5f9;
+    background: white;
     border: 1px solid #e2e8f0;
     color: #475569;
     padding: 8px 16px;
-    border-radius: 6px;
+    border-radius: 8px;
     font-size: 13px;
-    font-weight: 500;
+    font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
 }
-.action-btn-gray:hover { background: #e2e8f0; }
+.action-btn-gray:hover { background: #f8fafc; border-color: #cbd5e1; }
 .action-btn-blue {
     background: #2563eb;
     border: 1px solid #2563eb;
     color: white;
     padding: 8px 16px;
-    border-radius: 6px;
+    border-radius: 8px;
     font-size: 13px;
-    font-weight: 500;
+    font-weight: 600;
     cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
 }
+.action-btn-blue:hover { background: #1d4ed8; }
 
 /* Dashboard Container */
 .dashboard-container {
-    padding: 24px 32px;
-    max-width: 1400px;
+    padding: 0 32px 32px 32px;
+    max-width: 1600px;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
@@ -2279,77 +2373,105 @@ onMounted(async () => {
 .metrics-row-5 {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
-    gap: 20px;
+    gap: 16px;
+    margin-bottom: 24px;
 }
 .metric-card {
     background: white;
-    border: 1px solid #f1f5f9;
+    border: 1px solid #e2e8f0;
     border-radius: 12px;
-    padding: 20px;
+    padding: 24px 20px;
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
     box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+    transition: all 0.2s;
+    min-height: 120px;
 }
-.mc-title { font-size: 12px; color: #64748b; margin-bottom: 8px; }
-.mc-val-group { display: flex; align-items: baseline; gap: 4px; }
-.mc-val { font-size: 28px; font-weight: 700; color: #0f172a; font-family: 'Inter', sans-serif; }
+.metric-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 16px rgba(0,0,0,0.04);
+}
+.mc-title { font-size: 13px; color: #64748b; margin-bottom: 12px; font-weight: 500; }
+.mc-val-group { display: flex; align-items: baseline; gap: 4px; line-height: 1; }
+.mc-val { font-size: 36px; font-weight: 700; color: #0f172a; font-family: 'DIN Alternate', 'Inter', sans-serif; letter-spacing: -1px; }
 .mc-val.red { color: #ef4444; }
-.mc-unit { font-size: 12px; color: #94a3b8; }
-.mc-trend { font-size: 12px; font-weight: 500; }
+.mc-unit { font-size: 13px; color: #94a3b8; font-weight: 500; }
+.mc-trend { font-size: 12px; font-weight: 500; margin-top: 8px; display: flex; align-items: center; gap: 2px; }
 .mc-trend.down { color: #ef4444; }
 .mc-trend.up { color: #10b981; }
 
 /* 2. Main Layout Grid */
 .main-layout-grid {
     display: grid;
-    grid-template-columns: 2fr 1fr;
-    gap: 24px;
-    height: 400px;
+    grid-template-columns: 2.2fr 1fr;
+    gap: 20px;
+    margin-bottom: 24px;
+    align-items: start;
+    height: auto;
 }
 .chart-wrapper {
     background: white;
     border-radius: 12px;
-    padding: 20px;
-    border: 1px solid #f1f5f9;
+    padding: 24px;
+    border: 1px solid #e2e8f0;
     box-shadow: 0 1px 2px rgba(0,0,0,0.02);
     display: flex;
     flex-direction: column;
+    height: 420px;
 }
-.cw-header { margin-bottom: 20px; font-size: 14px; font-weight: 700; color: #334155; display: flex; align-items: center; gap: 8px; }
-.cw-header .icon { color: #64748b; }
-.cw-body { flex: 1; overflow: hidden; position: relative; }
-.chart-full { width: 100%; height: 100%; }
+.cw-header { margin-bottom: 24px; font-size: 15px; font-weight: 700; color: #1e293b; display: flex; align-items: center; gap: 8px; }
+.cw-header .icon { color: #ef4444; background: #fee2e2; width: 24px; height: 24px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+.cw-body {
+    flex: 1;
+    width: 100%;
+    min-height: 0;
+    position: relative;
+}
+.chart-full {
+    width: 100%;
+    height: 100%;
+}
+.mock-pie-placeholder {
+    width: 100%;
+    height: 100%;
+}
+
 
 /* List Wrapper (Right side) */
 .list-wrapper {
     background: white;
     border-radius: 12px;
-    padding: 20px;
-    border: 1px solid #f1f5f9;
+    padding: 0;
+    border: 1px solid #e2e8f0;
     display: flex; 
     flex-direction: column;
+    height: 420px;
+    overflow: hidden;
 }
-.lw-tabs { display: flex; gap: 24px; margin-bottom: 16px; border-bottom: 1px solid #f1f5f9; }
+.lw-tabs { display: flex; padding: 0 16px; border-bottom: 1px solid #f1f5f9; gap: 20px; }
 .lw-tab { 
-    padding-bottom: 10px; 
+    padding: 16px 0; 
     font-size: 13px; 
     color: #64748b; 
     cursor: pointer; 
     position: relative; 
+    font-weight: 500;
 }
 .lw-tab.active { color: #2563eb; font-weight: 600; }
 .lw-tab.active::after {
-    content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 2px; background: #2563eb;
+    content: ''; position: absolute; bottom: -1px; left: 0; right: 0; height: 2px; background: #2563eb; border-radius: 2px 2px 0 0;
 }
-.lw-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
-.lw-item { padding-bottom: 12px; border-bottom: 1px solid #f8fafc; }
-.lwi-head { display: flex; justify-content: space-between; margin-bottom: 4px; }
-.lwi-platform { font-size: 12px; color: #2563eb; font-weight: 600; }
+.lw-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; padding: 0; }
+.lw-item { padding: 16px; border-bottom: 1px solid #f8fafc; transition: background 0.2s; }
+.lw-item:hover { background: #f8fafc; }
+.lwi-head { display: flex; justify-content: space-between; margin-bottom: 8px; align-items: center; }
+.lwi-platform { font-size: 12px; color: #2563eb; font-weight: 600; background: #eff6ff; padding: 2px 8px; border-radius: 4px; }
 .lwi-time { font-size: 11px; color: #94a3b8; }
-.lwi-title { font-size: 13px; color: #334155; font-weight: 500; margin-bottom: 6px; line-height: 1.4; }
-.lwi-stats { display: flex; gap: 12px; font-size: 11px; color: #94a3b8; }
+.lwi-title { font-size: 14px; color: #1e293b; font-weight: 600; margin-bottom: 10px; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.lwi-stats { display: flex; gap: 16px; font-size: 11px; color: #94a3b8; align-items: center; }
+.lwi-stats span { display: flex; align-items: center; gap: 4px; }
 .lwi-tags { margin-top: 8px; }
 .lwi-tag { font-size: 10px; background: #f1f5f9; color: #64748b; padding: 2px 6px; border-radius: 4px; }
 

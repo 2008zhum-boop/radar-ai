@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Body, Depends, HTTPException, status, Form
+from fastapi import FastAPI, Body, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
@@ -6,6 +6,8 @@ from typing import List, Optional
 
 # === 引入各功能模块 ===
 from radar_weibo import get_weibo_hot_list
+from radar_ai import generate_smart_outline, generate_full_article
+from ai_engine import generate_analysis
 from radar_prediction import generate_predictions, predict_future_trends
 from radar_monitor import (
     process_monitor_data, 
@@ -21,51 +23,96 @@ from radar_monitor import (
     remove_source_from_blacklist,
     associate_content_to_client,
     correct_content_classification,
-    correct_content_classification,
     get_content_quality_stats
 )
-from radar_selections import (
-    add_selection, 
-    get_selections, 
-    update_selection_status, 
-    delete_selection
-)
 from radar_report import generate_client_report
-from ai_engine import generate_analysis, generate_outline, generate_article_from_outline, polish_interview_notes, refine_article_with_chat
-# from radar_ai import analyze_topic_deeply, generate_full_outline
-import io
-from fastapi import UploadFile, File
+# 引入快报模块
+from radar_flash import (
+    fetch_all_flashes, 
+    get_published_flashes, 
+    get_raw_flashes,
+    add_flash_config,
+    delete_flash_config,
+    get_flash_configs
+)
 
+# 引入认证模块
 from radar_auth import (
-    User, get_current_active_user, get_admin_user, 
-    create_access_token, get_user, create_user, verify_password,
-    list_users, update_user_role, delete_user, Token
+    User, Token, get_current_active_user, get_admin_user, 
+    create_access_token, verify_password, get_user, create_user,
+    list_users, update_user_role, delete_user
 )
 
 app = FastAPI()
 
-# CORS
-origins = [
-    "http://localhost:5173",
-    "http://localhost:8000",
-    "https://radar-ai-woad.vercel.app",
-    "https://radar-backend-cvaq.onrender.com"
-]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# === Auth Logic ===
+# === 定义数据模型 ===
+class PredictionRequest(BaseModel):
+    keywords: List[str]
+
+class AiAnalyzeReq(BaseModel):
+    topic: str
+
+class AiOutlineReq(BaseModel):
+    title: str
+    angle: str
+    context: Optional[str] = ""
+
+class AiArticleReq(BaseModel):
+    title: str
+    outline: List
+    context: Optional[str] = ""
+
+class AdvancedRule(BaseModel):
+    rule_name: str
+    must_contain: List[str]
+    nearby_words: List[str]
+    distance: int = 50
+    risk_level: int = 3
+
+class ClientConfigReq(BaseModel):
+    client_id: Optional[str] = None
+    name: str
+    industry: str = "综合"
+    status: int = 1       
+    brand_keywords: List[str]
+    exclude_keywords: List[str]
+    advanced_rules: List[AdvancedRule]
+
+class DeleteReq(BaseModel):
+    client_id: str
+
+# 报告请求模型
+class ReportReq(BaseModel):
+    client_id: str
+
+# 注册请求模型
+class RegisterReq(BaseModel):
+    username: str
+    password: str
+    email: str = ""
+
+# 权限修改请求
+class RoleReq(BaseModel):
+    username: str
+    role: str
+    status: int
+
+# === 认证接口 ===
+
 @app.post("/auth/register")
-def register(user: User, password: str = Body(..., embed=True)):
-    success, msg = create_user(user, password)
+def register(req: RegisterReq):
+    success, msg = create_user(User(username=req.username, email=req.email), req.password)
     if not success:
         raise HTTPException(status_code=400, detail=msg)
-    return {"status": "success", "username": user.username}
+    return {"msg": "User created successfully"}
 
 @app.post("/auth/login", response_model=Token)
 def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
@@ -76,180 +123,144 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    access_token = create_access_token(
-        data={"sub": user.username, "role": user.role}
-    )
+    access_token = create_access_token(data={"sub": user.username, "role": user.role})
     return {"access_token": access_token, "token_type": "bearer"}
 
-@app.get("/auth/me", response_model=User)
+@app.get("/auth/me")
 def read_users_me(current_user: User = Depends(get_current_active_user)):
     return current_user
 
-# === Admin Logic ===
+# === 管理员接口 ===
+
 @app.get("/admin/users")
-def get_all_users(user: User = Depends(get_admin_user)):
+def get_all_users(admin: User = Depends(get_admin_user)):
     return list_users()
 
 @app.post("/admin/user/role")
-def change_role(
-    username: str = Body(...), 
-    role: str = Body(...), 
-    status: int = Body(...),
-    user: User = Depends(get_admin_user)
-):
-    update_user_role(username, role, status)
+def change_user_role(req: RoleReq, admin: User = Depends(get_admin_user)):
+    update_user_role(req.username, req.role, req.status)
     return {"status": "success"}
 
 @app.post("/admin/user/delete")
-def remove_user(username: str = Body(...), user: User = Depends(get_admin_user)):
-    delete_user(username)
-    return {"status": "success"}
+def remove_user(req: RoleReq, admin: User = Depends(get_admin_user)):
+    if delete_user(req.username):
+        return {"status": "success"}
+    return {"status": "failed", "msg": "Cannot delete admin"}
 
-# === Core Business Logic Endpoints ===
+# === 业务接口 (部分加权保护) ===
+
+@app.get("/")
+def read_root(): return {"msg": "Running"}
 
 @app.get("/hotlist")
-def api_hotlist(category: str = "综合", user: User = Depends(get_current_active_user)):
-    return {"status": "success", "data": get_weibo_hot_list(category)}
-
-class PredictionReq(BaseModel):
-    keywords: List[str]
-
-@app.post("/predictions")
-def api_predictions(req: PredictionReq, user: User = Depends(get_current_active_user)):
-    return generate_predictions(req.keywords)
-
-@app.get("/prediction/trends")
-def api_predict_global_trends(user: User = Depends(get_current_active_user)):
-    return {"status": "success", "data": predict_future_trends()}
-
-# 监控相关
-@app.get("/monitor/clients")
-def api_get_clients(user: User = Depends(get_current_active_user)):
-    return get_all_clients()
-
-class ClientSaveReq(BaseModel):
-    id: Optional[str] = None
-    name: str
-    industry: str
-    competitors: List[str]
-    products: List[str]
-    config: dict
-
-@app.post("/monitor/client/save")
-def api_save_client(req: ClientSaveReq, user: User = Depends(get_current_active_user)):
-    return save_full_client_config(req.dict())
-
-class ClientDelReq(BaseModel):
-    client_id: str
-
-@app.post("/monitor/client/delete")
-def api_delete_client(req: ClientDelReq, user: User = Depends(get_current_active_user)):
-    return delete_client_by_id(req.client_id)
-
-class ReportReq(BaseModel):
-    client_id: str
-
-@app.post("/monitor/report/generate")
-def api_gen_report(req: ReportReq, user: User = Depends(get_current_active_user)):
-    return generate_client_report(req.client_id)
-
-# === Models ===
-class AiAnalyzeReq(BaseModel):
-    topic: str
-    instruction: Optional[str] = None
-
-class AiOutlineReq(BaseModel):
-    topic: str
-    angle: str
+def read_hotlist(category: str = "综合", user: User = Depends(get_current_active_user)):
+    raw = get_weibo_hot_list(category)
+    flat = []
+    for k,v in raw.items(): flat.extend(v)
+    monitor_res = process_monitor_data(flat)
+    return {"data": raw, "alerts": monitor_res['alerts']}
 
 @app.post("/ai/analyze")
 def api_analyze_topic(req: AiAnalyzeReq, user: User = Depends(get_current_active_user)):
-    """深度分析话题，返回选题策略（strategies: angle, title, reason, outline）"""
-    # 切换回 ai_engine (DeepSeek)
-    
-    # 尝试获取实时热点上下文
-    hot_context = []
-    try:
-        hot_list = get_weibo_hot_list()
-        hot_context = [h['title'] for h in hot_list]
-    except:
-        pass
-        
-    # 如果有 instruction，拼接到 topic 中 (ai_engine 暂无独立 instruction 字段)
-    topic_query = req.topic
-    if req.instruction:
-        topic_query += f" (Note: {req.instruction})"
-
-    data = generate_analysis(topic_query, hot_context=hot_context)
-    return {"status": "success", "data": data}
-
-@app.post("/ai/outline")
-def api_generate_outline_ai(req: AiOutlineReq, user: User = Depends(get_current_active_user)):
-    """根据话题+角度生成详细大纲（h1 + text），转为前端 structure 格式"""
-    # 切换回 ai_engine (DeepSeek)
-    structure = generate_outline(req.topic, req.angle)
-    
-    # 兼容处理
-    if structure and isinstance(structure[0], str):
-         structure = [{"title": s, "sub_points": []} for s in structure]
-         
-    return {"status": "success", "data": {"structure": structure}}
-
-# === 今日热点-极速成稿：备用 ai_engine 选题/大纲/成文 ===
-class AnalyzeTopicReq(BaseModel):
-    topic: str
-
-class GenerateOutlineReq(BaseModel):
-    title: str
-    angle: str
-    context: Optional[str] = ""
-
-class GenerateArticleReq(BaseModel):
-    title: str
-    outline: List[dict]  # [{ title, sub_points }] 或 前端传 structure
-    context: Optional[str] = ""
-    selection_id: Optional[int] = None  # Optional linkage to a selection
+    raw = generate_analysis(req.topic)
+    angles = (raw or {}).get("angles", []) if isinstance(raw, dict) else []
+    titles = (raw or {}).get("titles", []) if isinstance(raw, dict) else []
+    strategies = []
+    for i in range(max(len(angles), len(titles), 3)):
+        strategies.append({
+            "angle": angles[i] if i < len(angles) else f"角度{i+1}",
+            "icon": "✨",
+            "title": titles[i] if i < len(titles) else req.topic,
+            "reason": (raw or {}).get("emotion", "") if isinstance(raw, dict) else ""
+        })
+    return {"status": "success", "data": {"topic": req.topic, "analysis": (raw or {}).get("emotion", ""), "strategies": strategies}}
 
 @app.post("/analyze")
-def analyze_topic(req: AnalyzeTopicReq, user: User = Depends(get_current_active_user)):
-    """选题分析：返回情绪、角度、爆款标题建议（财经科技媒体向）"""
-    # 尝试混入实时热点上下文
-    hot_context = []
-    try:
-        hot_list = get_weibo_hot_list()
-        hot_context = [h['title'] for h in hot_list]
-    except:
-        pass
+def api_analyze_topic_compat(req: AiAnalyzeReq, user: User = Depends(get_current_active_user)):
+    raw = generate_analysis(req.topic)
+    angles = (raw or {}).get("angles", []) if isinstance(raw, dict) else []
+    titles = (raw or {}).get("titles", []) if isinstance(raw, dict) else []
+    strategies = []
+    for i in range(max(len(angles), len(titles), 3)):
+        strategies.append({
+            "angle": angles[i] if i < len(angles) else f"角度{i+1}",
+            "icon": "✨",
+            "title": titles[i] if i < len(titles) else req.topic,
+            "reason": (raw or {}).get("emotion", "") if isinstance(raw, dict) else ""
+        })
+    return {"status": "success", "data": {"topic": req.topic, "analysis": (raw or {}).get("emotion", ""), "strategies": strategies}}
 
-    result = generate_analysis(req.topic, hot_context=hot_context)
-    return result
+@app.post("/ai/outline")
+def api_generate_outline(req: AiOutlineReq, user: User = Depends(get_current_active_user)):
+    raw = generate_smart_outline(req.title, req.angle, req.context or "")
+    structure = []
+    for item in (raw or {}).get("structure", []):
+        structure.append({
+            "title": item.get("title", ""),
+            "sub_points": item.get("sub_points", [])
+        })
+    return {"status": "success", "data": {"structure": structure}}
 
 @app.post("/generate_outline")
-def api_generate_outline(req: GenerateOutlineReq, user: User = Depends(get_current_active_user)):
-    """生成文章大纲，返回 structure: [{ title, sub_points }]"""
-    sections = generate_outline(req.title, req.angle)
-    # 兼容前端：sections 为字符串数组时转为 structure
-    if sections and isinstance(sections[0], str):
-        structure = [{"title": s, "sub_points": []} for s in sections]
-    else:
-        structure = sections
+def api_generate_outline_compat(req: AiOutlineReq, user: User = Depends(get_current_active_user)):
+    raw = generate_smart_outline(req.title, req.angle, req.context or "")
+    structure = []
+    for item in (raw or {}).get("structure", []):
+        structure.append({
+            "title": item.get("title", ""),
+            "sub_points": item.get("sub_points", [])
+        })
     return {"status": "success", "data": {"structure": structure}}
 
 @app.post("/generate_article")
-def api_generate_article(req: GenerateArticleReq, user: User = Depends(get_current_active_user)):
-    """根据大纲生成全文（财经科技行业媒体风格）"""
-    outline = req.outline
-    if isinstance(outline, list) and outline and isinstance(outline[0], dict):
-        pass  # 已是 structure
-    else:
-        outline = [{"title": str(s), "sub_points": []} for s in (outline or [])]
-    full_text = generate_article_from_outline(req.title, outline, req.context or "")
-    
-    # If linked to a selection, mark it as completed
-    if req.selection_id:
-        update_selection_status(req.selection_id, user.username, "completed")
+def api_generate_article(req: AiArticleReq, user: User = Depends(get_current_active_user)):
+    text = generate_full_article(req.title, req.outline, context_info=req.context or "")
+    return {"status": "success", "data": text}
+
+# NEW: Global Prediction API
+@app.get("/prediction/trends")
+def get_predicted_trends(user: User = Depends(get_current_active_user)):
+    """
+    Get global hotspot predictions based on acceleration logic.
+    """
+    data = predict_future_trends()
+    return {"count": len(data), "data": data}
+
+@app.post("/predictions")
+def read_predictions(req: PredictionRequest, user: User = Depends(get_current_active_user)):
+    data = generate_predictions(req.keywords)
+    return {"count": len(data), "data": data}
+
+@app.get("/monitor/dashboard")
+def read_dash(client_id: Optional[str] = None, user: User = Depends(get_current_active_user)): 
+    return get_monitor_stats(client_id)
+
+@app.get("/monitor/clients")
+def read_clients(user: User = Depends(get_current_active_user)):
+    return get_all_clients()
+
+@app.post("/monitor/client/save")
+def save_client(req: ClientConfigReq, user: User = Depends(get_current_active_user)):
+    # 只有 admin 和 editor 可以修改配置
+    if user.role not in ["admin", "editor"]:
+        raise HTTPException(status_code=403, detail="Permission denied")
         
-    return {"status": "success", "data": full_text}
+    logic = {
+        "brand_keywords": req.brand_keywords,
+        "exclude_keywords": req.exclude_keywords,
+        "advanced_rules": [r.dict() for r in req.advanced_rules]
+    }
+    return save_full_client_config(req.name, req.industry, req.status, logic, req.client_id)
+
+@app.post("/monitor/client/delete")
+def delete_client(req: DeleteReq, user: User = Depends(get_admin_user)):
+    # 只有 admin 可以删除
+    return delete_client_by_id(req.client_id)
+
+@app.post("/monitor/report/generate")
+def create_report_endpoint(req: ReportReq, user: User = Depends(get_current_active_user)):
+    data = generate_client_report(req.client_id)
+    return {"status": "success", "data": data}
 
 # ==========================================
 # === 全网内容库管理接口 ===
@@ -257,7 +268,6 @@ def api_generate_article(req: GenerateArticleReq, user: User = Depends(get_curre
 
 class ContentFilterReq(BaseModel):
     search_text: str = ""
-    client_id: Optional[str] = None  # Added for filtering by client
     source_filter: Optional[List[str]] = None
     sentiment_filter: Optional[List[str]] = None
     clean_status_filter: Optional[List[str]] = None
@@ -290,7 +300,6 @@ def search_content_library(req: ContentFilterReq, user: User = Depends(get_curre
     try:
         result = get_global_content_library(
             search_text=req.search_text,
-            client_id=req.client_id,
             source_filter=req.source_filter,
             sentiment_filter=req.sentiment_filter,
             clean_status_filter=req.clean_status_filter,
@@ -354,6 +363,7 @@ def correct_ai_judgment(req: CorrectionReq, user: User = Depends(get_current_act
         corrected_by=user.username
     )
 
+# ==========================================
 # [API-8] 数据质检统计
 @app.get("/content/quality-stats")
 def fetch_quality_stats(user: User = Depends(get_current_active_user)):
@@ -361,258 +371,71 @@ def fetch_quality_stats(user: User = Depends(get_current_active_user)):
     return get_content_quality_stats()
 
 # ==========================================
-# === 我的选题管理接口 ===
+# [API-9] 快报监控相关接口 (Flash News)
 # ==========================================
-class SelectionAddReq(BaseModel):
-    topic: str
-    source: str = "Manual"
-    hotspot_id: Optional[str] = None
 
-class SelectionUpdateReq(BaseModel):
-    id: int
-    status: str
+# 引入快报模块 (Updated)
+from radar_flash import (
+    init_flash_db,
+    fetch_all_flashes, 
+    backfill_rewrite,
+    get_flashes,
+    update_flash_status
+)
 
-class SelectionDelReq(BaseModel):
-    id: int
+# ...
 
-class SelectionListReq(BaseModel):
-    page: int = 1
-    page_size: int = 20
-    status: Optional[str] = None  # todo, completed, abandoned, all
-
-@app.post("/selections/add")
-def api_add_selection(req: SelectionAddReq, user: User = Depends(get_current_active_user)):
-    """添加我的选题"""
-    return add_selection(user.username, req.topic, req.source, req.hotspot_id)
-
-@app.post("/selections/list")
-def api_list_selections(req: SelectionListReq, user: User = Depends(get_current_active_user)):
-    """获取我的选题列表"""
-    return get_selections(user.username, req.status, req.page, req.page_size)
-
-@app.post("/selections/update_status")
-def api_update_selection_status(req: SelectionUpdateReq, user: User = Depends(get_current_active_user)):
-    """更新选题状态"""
-    return update_selection_status(req.id, user.username, req.status)
-
-@app.post("/selections/delete")
-def api_delete_selection(req: SelectionDelReq, user: User = Depends(get_current_active_user)):
-    """删除选题"""
-    return delete_selection(req.id, user.username)
-
-# ==========================================
-# === 智能创作 - 文章管理接口 ===
-# ==========================================
-from radar_articles import save_article, get_articles, get_article_detail, delete_article
-
-class ArticleSaveReq(BaseModel):
-    id: Optional[int] = None
-    title: str
-    content: str
-    summary: str = ""
-    cover_url: str = ""
-    topic: str = ""
-    status: str = "draft"  # draft, published
-
-class ArticleListReq(BaseModel):
-    page: int = 1
-    page_size: int = 10
-    status: Optional[str] = None  # draft, published, all
-    search: Optional[str] = None
-
-class ArticleDelReq(BaseModel):
-    id: int
-
-@app.post("/articles/save")
-def article_save(req: ArticleSaveReq, user: User = Depends(get_current_active_user)):
-    """保存或发布文章（草稿/已发布）"""
-    return save_article(
-        user_id=user.username,
-        title=req.title,
-        content=req.content,
-        summary=req.summary,
-        cover_url=req.cover_url,
-        topic=req.topic,
-        status=req.status,
-        article_id=req.id
-    )
-
-@app.post("/articles/list")
-def article_list(req: ArticleListReq, user: User = Depends(get_current_active_user)):
-    """获取文章列表（我的作品）"""
-    return get_articles(
-        user_id=user.username,
-        status=req.status,
-        search=req.search,
-        page=req.page,
-        page_size=req.page_size
-    )
-
-@app.get("/articles/{article_id}")
-def article_detail(article_id: int, user: User = Depends(get_current_active_user)):
-    """获取单篇文章详情"""
-    art = get_article_detail(article_id)
-    if not art:
-        raise HTTPException(status_code=404, detail="Article not found")
-    if art['user_id'] != user.username and user.role != 'admin':
-         # Simple privacy check
-         raise HTTPException(status_code=403, detail="Permission denied")
-    return {"status": "success", "data": art}
-
-@app.post("/articles/delete")
-def article_delete(req: ArticleDelReq, user: User = Depends(get_current_active_user)):
-    """删除文章"""
-    res = delete_article(req.id, user.username)
-    if "error" in res:
-        raise HTTPException(status_code=400, detail=res["error"])
-    return res
-
-
-class RefineReq(BaseModel):
-    content: str
-    instruction: str
-
-@app.post("/ai/refine")
-def refine_article_endpoint(req: RefineReq):
-    new_content = refine_article_with_chat(req.content, req.instruction)
-    return {"content": new_content}
-
-# === AI 润色接口 ===
-@app.post("/ai/polish/upload")
-async def polish_uploaded_file(file: UploadFile = File(...), instruction: Optional[str] = Form(None)):
+@app.get("/flash/list")
+def read_flash_list(status: str = "all", source: str = "all", limit: int = 50, user: User = Depends(get_current_active_user)):
+    """获取快报列表
+    status: 'all' | 'draft' | 'published' | 'discarded'
     """
-    上传 .docx 或 .txt 文件，读取内容并进行 AI 润色
-    """
-    content = ""
-    filename = file.filename.lower()
-    
-    try:
-        contents = await file.read()
-        
-        if filename.endswith(".docx"):
-            import docx
-            doc = docx.Document(io.BytesIO(contents))
-            full_text = []
-            for para in doc.paragraphs:
-                full_text.append(para.text)
-            content = "\n".join(full_text)
-            
-        elif filename.endswith(".txt"):
-            content = contents.decode("utf-8")
-        elif filename.endswith(".pdf"):
-            import pdfplumber
-            with pdfplumber.open(io.BytesIO(contents)) as pdf:
-                full_text = []
-                for page in pdf.pages:
-                    text = page.extract_text()
-                    if text:
-                        full_text.append(text)
-                content = "\n".join(full_text)
-        else:
-            raise HTTPException(status_code=400, detail="Use .docx, .pdf or .txt files")
-            
-        if len(content.strip()) < 10:
-             raise HTTPException(status_code=400, detail="File content is too short")
+    return get_flashes(status, limit, source)
 
-        # Call AI (Now returns dict {title, summary, content})
-        # Note: We need to update polish_interview_notes to accept instruction
-        result = polish_interview_notes(content, instruction)
-        return {"data": result}
-        
-    except Exception as e:
-        print(f"Error processing file: {e}")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+@app.post("/flash/update")
+def update_flash(
+    id: int = Body(...), 
+    status: str = Body(...), 
+    content: Optional[str] = Body(None),
+    title: Optional[str] = Body(None),
+    user: User = Depends(get_current_active_user)
+):
+    """更新快报状态或内容"""
+    if user.role not in ["admin", "editor"]:
+        raise HTTPException(status_code=403, detail="Permission denied")
+    return update_flash_status(id, status, content, title)
 
-class PolishTextReq(BaseModel):
-    content: str
-    instruction: Optional[str] = None
+@app.get("/flash/fetch")
+def trigger_flash_fetch(source: str = "cls", user: User = Depends(get_current_active_user)):
+    """手动触发快报抓取 (Also triggers at interval in background usually)"""
+    items = fetch_all_flashes(source)
+    return {"status": "success", "count": len(items)}
 
-@app.post("/ai/polish/text")
-def polish_raw_text_endpoint(req: PolishTextReq):
-    """直接润色文本"""
-    if len(req.content.strip()) < 10:
-        raise HTTPException(status_code=400, detail="Content is too short")
-    try:
-        result = polish_interview_notes(req.content, req.instruction)
-        return {"data": result}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-# ==========================================
-# === Agent 管理接口 ===
-# ==========================================
-from radar_agent import create_agent, get_agents, delete_agent, run_agent_task, update_agent
-
-class AgentCreateReq(BaseModel):
-    name: str
-    angle: str
-    prompt: str
-    style: Optional[str] = ""
-    word_count: Optional[int] = 1500
-    source: Optional[str] = ""
-    keywords: Optional[str] = ""
-
-class AgentUpdateReq(BaseModel):
-    id: int
-    name: str
-    angle: str
-    prompt: str
-    style: Optional[str] = ""
-    word_count: Optional[int] = 1500
-    source: Optional[str] = ""
-    keywords: Optional[str] = ""
-
-class AgentRunReq(BaseModel):
-    agent_id: int
-
-class AgentDelReq(BaseModel):
-    agent_id: int
-
-@app.get("/agents/list")
-def api_list_agents(user: User = Depends(get_current_active_user)):
-    """获取所有Agent"""
-    return {"status": "success", "data": get_agents()}
-
-@app.post("/agents/create")
-def api_create_agent(req: AgentCreateReq, user: User = Depends(get_current_active_user)):
-    """创建Agent"""
-    aid = create_agent(req.name, req.angle, req.prompt, req.style, req.word_count, req.source, req.keywords)
-    return {"status": "success", "id": aid}
-
-@app.post("/agents/update")
-def api_update_agent(req: AgentUpdateReq, user: User = Depends(get_current_active_user)):
-    """更新Agent"""
-    return update_agent(req.id, req.name, req.angle, req.prompt, req.style, req.word_count, req.source, req.keywords)
-
-@app.post("/agents/delete")
-def api_delete_agent(req: AgentDelReq, user: User = Depends(get_current_active_user)):
-    """删除Agent"""
-    delete_agent(req.agent_id)
+@app.post("/flash/backfill")
+def trigger_flash_backfill(limit: int = Body(10), user: User = Depends(get_current_active_user)):
+    """对缺失改写的草稿进行补写"""
+    backfill_rewrite(limit=limit)
     return {"status": "success"}
 
-@app.post("/agents/run")
-def api_run_agent(req: AgentRunReq, user: User = Depends(get_current_active_user)):
-    """运行Agent执行抓取和写作任务"""
-    result = run_agent_task(req.agent_id, user.username)
-    if "error" in result:
-         raise HTTPException(status_code=400, detail=result["error"])
-    return {"status": "success", "result": result}
+@app.post("/flash/config/add")
+def add_flash_cfg(type: str, value: str, user: User = Depends(get_admin_user)):
+    return add_flash_config(type, value)
 
+@app.get("/flash/config/list")
+def list_flash_cfg(user: User = Depends(get_current_active_user)):
+    return get_flash_configs()
 
+@app.post("/flash/config/delete")
+def del_flash_cfg(id: int, user: User = Depends(get_admin_user)):
+    return delete_flash_config(id)
 
-from ai_engine import generate_analysis, generate_outline, generate_article_from_outline, polish_interview_notes, refine_article_with_chat, generate_cover_image, smart_parse_topic
-
-# ... existing code ...
-
-class TopicParseReq(BaseModel):
-    text: str
-
-@app.post("/ai/topic/smart-parse")
-def api_smart_parse_topic(req: TopicParseReq):
-    topic = smart_parse_topic(req.text)
-    return {"status": "success", "topic": topic}
+@app.on_event("startup")
+def startup_event():
+    # Ensure flash tables and migrations are applied
+    try:
+        init_flash_db()
+    except Exception as e:
+        print(f"[flash] init failed: {e}")
 
 if __name__ == "__main__":
     import uvicorn

@@ -11,17 +11,19 @@
 
       <div class="card-header">
         <div class="rank-badge" :class="getRankClass(item.rank)">{{ item.rank }}</div>
-        <a :href="item.url" target="_blank" class="card-title" @click.stop>{{ item.title }}</a>
-        <!-- Prediction Labels -->
-        <span v-if="getPredictionLabel(item)" class="pred-tag" :class="getPredictionLabel(item).class">
-           {{ getPredictionLabel(item).text }}
-        </span>
-        <span v-else-if="item.label" class="hot-tag">{{ item.label }}</span>
+        <a :href="item.url" target="_blank" class="card-title" @click.stop>{{ displayTitle(item) }}</a>
+        <span v-if="item.label" class="hot-tag">{{ item.label }}</span>
+      </div>
+      <div class="card-excerpt" v-if="getExcerpt(item)">
+        {{ getExcerpt(item) }}
       </div>
 
       <div class="meta-row">
         <div class="heat-wrapper">
            <span class="heat-val">🔥 {{ formatNumber(item.heat) }}万热度</span>
+           <span v-if="getPredictionLabel(item)" class="pred-tag" :class="getPredictionLabel(item).class">
+             {{ getPredictionLabel(item).text }}
+           </span>
            <!-- Trend Indicator (Mocked for now based on simple logic or random if no data) -->
            <span class="trend-icon" :class="getTrendClass(item)">
              {{ getTrendIcon(item) }}
@@ -29,28 +31,6 @@
         </div>
         <span class="cat-tag"># {{ item.category || '综合' }}</span>
         <span v-for="tag in (item.tags || []).slice(0,2)" :key="tag" class="content-tag">{{ tag }}</span>
-      </div>
-
-      <!-- AI Box -->
-      <div class="ai-box">
-        <div class="ai-header">
-           <span class="ai-title">✨ AI 提炼</span>
-           <button class="expand-btn" @click.stop="toggleExpand(item.title)">
-             {{ expandedItems.has(item.title) ? '收起 ∧' : '展开 ∨' }}
-           </button>
-        </div>
-        
-        <div class="ai-content" :class="{ collapsed: !expandedItems.has(item.title) }">
-           <!-- Simulation of Fact vs Angle -->
-           <div class="ai-section">
-             <span class="ai-label fact">事实:</span>
-             <span class="ai-text" v-html="highlightKeywords(getSummaryFact(item.summary))"></span>
-           </div>
-           <div class="ai-section" v-if="getSummaryAngle(item.summary)">
-             <span class="ai-label angle">角度:</span>
-             <span class="ai-text highlight" v-html="highlightKeywords(getSummaryAngle(item.summary))"></span>
-           </div>
-        </div>
       </div>
 
       <!-- Client Relevance -->
@@ -95,14 +75,22 @@
       </div>
 
       <div class="card-footer">
-        <button class="action-btn blue" @click.stop="$emit('analyze', item)">
-           <span class="btn-icon">📊</span> 深度分析
+        <button
+          class="action-btn blue"
+          :class="{ disabled: isPublished(item) }"
+          :disabled="isPublished(item)"
+          @click.stop="$emit('publish', item)"
+        >
+           <span class="btn-icon">📰</span> 发快报
         </button>
-        <button class="action-btn purple" @click.stop="$emit('add-selection', item)">
-           <span class="btn-icon">📌</span> 加入选题
+        <button class="action-btn green" @click.stop="$emit('write', item)">
+           <span class="btn-icon">✍️</span> 写文章
         </button>
-        <button class="action-btn green" @click.stop="$emit('instant-draft', item.title)">
-           <span class="btn-icon">⚡</span> 极速成稿
+        <button class="action-btn gray" @click.stop="$emit('add-topic', item)">
+           <span class="btn-icon">➕</span> 加入选题
+        </button>
+        <button class="action-btn red" @click.stop="$emit('dismiss', item.title)">
+           <span class="btn-icon">🗑️</span> 回收站
         </button>
       </div>
     </div>
@@ -110,20 +98,13 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
 
 const props = defineProps({
-  list: Array
+  list: Array,
+  publishedTitles: { type: Array, default: () => [] }
 })
 
-const emit = defineEmits(['analyze', 'dismiss', 'click-item', 'instant-draft'])
-
-const expandedItems = ref(new Set())
-
-const toggleExpand = (id) => {
-  if (expandedItems.value.has(id)) expandedItems.value.delete(id)
-  else expandedItems.value.add(id)
-}
+const emit = defineEmits(['publish', 'dismiss', 'click-item', 'analyze', 'write', 'add-topic'])
 
 const formatNumber = (num) => {
   if (num > 10000) return (num / 10000).toFixed(1)
@@ -148,6 +129,63 @@ const getTrendIcon = (item) => {
     return isRising ? '📈' : '📉'
 }
 
+const isPublished = (item) => {
+    if (!item || !item.title) return false
+    return props.publishedTitles.includes(item.title)
+}
+
+const getExcerpt = (item) => {
+    if (!item) return ''
+    if (isBaidu(item)) {
+        if (item.summary_text) return String(item.summary_text).trim()
+        if (typeof item.summary === 'string' && item.summary.trim()) return item.summary.trim()
+        if (item.summary && typeof item.summary === 'object' && item.summary.fact) return item.summary.fact.trim()
+        if (item.raw_summary_context) return String(item.raw_summary_context).trim()
+    }
+    if (item.summary_text) return String(item.summary_text).trim()
+    const title = (item.title || '').trim()
+    if (typeof item.summary === 'string' && item.summary.trim()) {
+        const s = item.summary.trim()
+        if (s !== title) return s
+    }
+    if (item.summary && typeof item.summary === 'object') {
+        const fact = item.summary.fact || ''
+        if (fact.trim() && fact.trim() !== title) return fact.trim()
+    }
+    if (item.raw_summary_context) {
+        const text = String(item.raw_summary_context).trim()
+        if (text && text !== title) return text
+    }
+    if (item.full_content) {
+        const parts = String(item.full_content).split('\n').map(p => p.trim()).filter(Boolean)
+        if (parts.length >= 2) return parts[1]
+        if (parts.length === 1) return parts[0]
+    }
+    // 最后兜底：展示标题的第二段（按标点切分）
+    if (title) {
+        const segments = title.split(/[。！？.!?]/).map(s => s.trim()).filter(Boolean)
+        if (segments.length >= 2) return segments[1]
+    }
+    return ''
+}
+
+const cleanTitle = (title) => {
+    if (!title) return ''
+    return String(title)
+        .replace(/\s*[\\-|｜|·|•]\\s*[^\\-|｜|·|•]{2,20}$/g, '')
+        .trim()
+}
+
+const isBaidu = (item) => {
+    const src = (item && (item.source || item.source_name || '')) || ''
+    return src.includes('百度')
+}
+
+const displayTitle = (item) => {
+    if (!item) return ''
+    return cleanTitle(item.title)
+}
+
 const getPredictionLabel = (item) => {
     if (item.rank <= 3) return { text: '🚀 爆发期', class: 'rocket' }
     if (item.heat > 1000000 && item.rank > 10 && item.rank < 15) return { text: '🔥 潜力股', class: 'potential' }
@@ -159,40 +197,12 @@ const getSourceColor = (src) => {
     return map[src] || '#94a3b8'
 }
 
-// Summary Parsing
-const getSummaryFact = (summary) => {
-    if (!summary) return '暂时无法获取详情。'
-    if (typeof summary === 'object') return summary.fact || 'AI分析中...'
-    
-    // Legacy String Handling
-    const str = String(summary)
-    const parts = str.split('。')
-    if (parts.length < 2) return str
-    return parts[0] + '。' + parts[1] + '。'
-}
-
-const getSummaryAngle = (summary) => {
-    if (!summary) return ''
-    if (typeof summary === 'object') return summary.angle || ''
-    
-    // Legacy String
-    const parts = summary.split('。')
-    if (parts.length > 2) return '建议切入：' + parts.slice(2).join('。')
-    return ''
-}
-
-const highlightKeywords = (text) => {
-    // Simple regex to bold monetary values, companies (mock), etc.
-    if (!text) return ''
-    return text.replace(/(\d+(?:万|亿)?(?:元|美元|人民币)?)/g, '<b>$1</b>')
-               .replace(/(?:“|")([^”"]+)(?:”|")/g, '<b>“$1”</b>')
-}
 </script>
 
 <style scoped>
 .hot-card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 20px;
   padding: 10px 0;
 }
@@ -220,7 +230,7 @@ const highlightKeywords = (text) => {
 .dismiss-btn:hover { color: #94a3b8; }
 
 /* Header */
-.card-header { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px; padding-right: 20px; }
+.card-header { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 6px; }
 .rank-badge { 
   min-width: 22px; height: 22px; line-height: 22px; 
   text-align: center; border-radius: 6px; 
@@ -233,10 +243,21 @@ const highlightKeywords = (text) => {
 .rank-common { background: #f1f5f9; color: #64748b; }
 
 .card-title { 
-  flex: 1; font-size: 17px; font-weight: 700; color: #1e293b; 
+  flex: 1; min-width: 0; font-size: 17px; font-weight: 700; color: #1e293b; 
   text-decoration: none; line-height: 1.4; letter-spacing: -0.01em;
 }
 .card-title:hover { color: #2563eb; }
+
+.card-excerpt {
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 6px 0 10px 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 
 /* Tags */
 .hot-tag { font-size: 10px; padding: 2px 6px; background: #fff1f2; color: #e11d48; border-radius: 4px; white-space: nowrap; }
@@ -252,26 +273,11 @@ const highlightKeywords = (text) => {
 .cat-tag { color: #3b82f6; background: #eff6ff; padding: 1px 6px; border-radius: 4px; font-weight: 500; }
 .content-tag { color: #64748b; background: #f1f5f9; padding: 1px 6px; border-radius: 4px; font-size: 12px; }
 
-/* AI Box */
-.ai-box { background: #f8fafc; border-radius: 8px; padding: 12px; margin-bottom: 12px; border: 1px solid #f1f5f9; }
-.ai-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-.ai-title { font-size: 12px; font-weight: 700; color: #2563eb; display: flex; align-items: center; gap: 4px; }
-.expand-btn { background: none; border: none; color: #94a3b8; font-size: 11px; cursor: pointer; }
-.expand-btn:hover { color: #64748b; }
-
-.ai-content.collapsed .ai-text {
-    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+@media (max-width: 1200px) {
+  .hot-card-grid {
+    grid-template-columns: 1fr;
+  }
 }
-.ai-content.collapsed .ai-section { margin-bottom: 0; } 
-.ai-content.collapsed .highlight { background: none; color: inherit; padding: 0; }
-
-.ai-section { margin-bottom: 6px; font-size: 13px; line-height: 1.6; color: #475569; }
-.ai-label { font-weight: 700; margin-right: 6px; font-size: 12px; }
-.ai-label.fact { color: #0f172a; }
-.ai-label.angle { color: #059669; }
-.ai-text { white-space: pre-wrap; }
-.ai-text.highlight { background: #f0fdf4; padding: 2px 4px; border-radius: 4px; color: #059669; }
-
 /* Client Relevance */
 .client-relevance { 
     display: flex; align-items: center; gap: 8px; margin-bottom: 12px; 
@@ -299,7 +305,7 @@ const highlightKeywords = (text) => {
 /* .dot removed, used src-dot */
 
 /* Footer */
-.card-footer { display: flex; gap: 12px; }
+.card-footer { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .action-btn { 
   flex: 1; border: none; padding: 8px; border-radius: 6px; 
   font-size: 13px; font-weight: 600; cursor: pointer; 
@@ -309,5 +315,7 @@ const highlightKeywords = (text) => {
 .action-btn:hover { transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
 .action-btn.blue { background: #eff6ff; color: #2563eb; }
 .action-btn.green { background: #f0fdf4; color: #16a34a; }
-.action-btn.purple { background: #f3e8ff; color: #9333ea; }
+.action-btn.gray { background: #f8fafc; color: #334155; }
+.action-btn.red { background: #fef2f2; color: #ef4444; }
+.action-btn.disabled { background: #f3f4f6; color: #9ca3af; cursor: not-allowed; box-shadow: none; transform: none; }
 </style>

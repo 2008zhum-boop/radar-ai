@@ -1,15 +1,16 @@
-# Python 后端忽略文件
-backend/venv/
-backend/.venv/
-backend/__pycache__/
-backend/*.pyc
-backend/*.pyo
-backend/*.db
-backend/.env
-backend/radar_data.db
+# === 忽略系统文件 ===
+.DS_Store
+.env
 
-# Node 前端忽略文件
+# === 忽略前端依赖 (关键!) ===
 frontend/node_modules/
 frontend/dist/
-frontend/.DS_Store
-.DS_Store
+frontend/.env.local
+
+# === 忽略后端缓存 ===
+backend/__pycache__/
+backend/.venv/
+backend/venv/
+*.pyc
+*.sqlite
+*.db

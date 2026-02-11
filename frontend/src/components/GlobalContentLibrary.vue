@@ -103,14 +103,21 @@
             <th width="40">
               <input type="checkbox" v-model="selectAll" @change="toggleSelectAll">
             </th>
-            <th width="200">标题</th>
+            <th width="150">事件标题</th>
+            <th width="150">文章标题</th>
+            <th width="60">原文链接</th>
+            <th width="150">摘要</th>
+            <th width="150">正文内容</th>
+            <th width="80">分类</th>
+            <th width="80">一级标签</th>
+            <th width="80">二级标签</th>
+            <th width="80">情感判断</th>
+            <th width="60">质量</th>
             <th width="80">来源</th>
-            <th width="120">分类 (标签)</th>
-            <th width="120">入库时间</th>
+            <th width="110">入库时间</th>
+            <th width="100">关联客户</th>
             <th width="80">热度</th>
-            <th width="100">AI 判定</th>
-            <th width="120">关联客户</th>
-            <th width="120">操作</th>
+            <th width="100">操作</th>
           </tr>
         </thead>
         <tbody>
@@ -118,35 +125,40 @@
             <td>
               <input type="checkbox" :value="item.id" v-model="selectedItems">
             </td>
+            <td><div class="text-truncate" :title="item.event_title">{{ item.event_title || '-' }}</div></td>
             <td class="title-cell">
               <div class="title-content">
-                <span class="title-text" @click="showPreview(item)">{{ item.title }}</span>
+                <span class="title-text text-truncate" @click="showPreview(item)" :title="item.article_title">{{ item.article_title || item.title }}</span>
                 <span v-if="item.clean_status === 'cleaned'" class="badge badge-success">已入库</span>
               </div>
             </td>
-            <td><span class="source-tag">{{ item.source }}</span></td>
             <td>
-                <div class="cat-tag-cell">
-                    <span class="cat-badge" v-if="item.category">{{ item.category }}</span>
-                    <span class="tag-text" v-if="item.tags">{{ Array.isArray(item.tags) ? item.tags.slice(0,2).join(',') : item.tags }}</span>
-                </div>
+               <a v-if="item.url" :href="item.url" target="_blank" class="url-link">🔗</a>
+               <span v-else>-</span>
             </td>
-            <td class="time-cell">{{ item.time_display }}</td>
-            <td class="hotness-cell"><span class="hotness">{{ item.hotness_display || item.hotness }}</span></td>
+            <td><div class="text-truncate" :title="item.summary">{{ item.summary || '-' }}</div></td>
+            <td><div class="text-truncate" :title="item.content_text">{{ item.content_text || '-' }}</div></td>
+            <td><span class="cat-badge" v-if="item.category">{{ item.category }}</span></td>
+            <td><span class="tag-text" v-if="item.primary_tag">{{ item.primary_tag }}</span></td>
+            <td><span class="tag-text" v-if="item.secondary_tag">{{ item.secondary_tag }}</span></td>
             <td>
               <div class="ai-judgment">
                 <span :class="'sentiment-' + item.sentiment_label">{{ item.sentiment_label }}</span>
               </div>
             </td>
+            <td>{{ item.quality_score || '-' }}</td>
+            <td><span class="source-tag">{{ item.source }}</span></td>
+            <td class="time-cell">{{ item.ingest_time_display || item.time_display }}</td>
             <td>
                <div v-if="item.matched_clients && item.matched_clients.length" class="client-info">
-                   {{ item.matched_clients.join(', ') }}
+                   {{ Array.isArray(item.matched_clients) ? item.matched_clients.join(', ') : item.matched_clients }}
                </div>
                <div v-else class="unassociated">-</div>
             </td>
+            <td class="hotness-cell"><span class="hotness">{{ item.hotness_display || item.hotness }}</span></td>
             <td class="actions-cell">
               <div class="action-buttons">
-                <button @click="showEditModal(item)" class="btn-small btn-default" title="编辑">✏️ 编辑</button>
+                <button @click="showEditModal(item)" class="btn-small btn-default" title="编辑">✏️</button>
                 <button @click="discardSingle(item.id)" class="btn-small btn-danger" title="删除">🗑️</button>
               </div>
             </td>
@@ -986,7 +998,15 @@ export default {
 
 .time-cell {
   white-space: nowrap;
-  color: #999;
+  vertical-align: middle;
+}
+
+.text-truncate {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 150px; /* Adjust as needed */
+  display: block;
 }
 
 .hotness-cell {

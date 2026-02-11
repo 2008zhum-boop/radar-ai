@@ -275,28 +275,34 @@ const removeRule = (idx) => form.advanced_rules.splice(idx, 1)
 
 const saveConfig = async () => {
   if (!form.name.trim()) return alert('请输入客户名称')
-  const formattedRules = form.advanced_rules.map(r => ({ 
-      rule_name: r.rule_name, 
-      risk_level: Number(r.risk_level), 
-      must_contain: r._must_str.split(',').filter(s=>s.trim()), 
-      nearby_words: r._near_str.split(',').filter(s=>s.trim()), 
-      distance: Number(r.distance) 
+  
+  // Robust formatting for rules
+  const formattedRules = (form.advanced_rules || []).map(r => ({ 
+      rule_name: r.rule_name || '新规则', 
+      risk_level: Number(r.risk_level ?? 3), 
+      must_contain: (r._must_str || '').split(',').filter(s=>s.trim()), 
+      nearby_words: (r._near_str || '').split(',').filter(s=>s.trim()), 
+      distance: Number(r.distance || 50) 
   }))
   
+  // Ensure strict null for new clients (not undefined or empty string)
+  const cid = form.client_id || null;
+
   try { 
       await saveClientConfig({ 
-          client_id: form.client_id, // Pass ID for updates
+          client_id: cid,
           name: form.name, 
           industry: form.industry, 
           status: Number(form.status), 
-          brand_keywords: form.brand_keywords, 
-          exclude_keywords: form.exclude_keywords, 
+          brand_keywords: [...form.brand_keywords], // Copy array
+          exclude_keywords: [...form.exclude_keywords], // Copy array
           advanced_rules: formattedRules 
       }); 
       showModal.value = false; 
       await loadData(); 
   } catch (e) { 
-      alert("保存失败: " + e.message) 
+      console.error("Save failed:", e)
+      alert("保存失败: " + (e.response?.data?.detail || e.message)) 
   }
 }
 const confirmDelete = async (client) => { if (confirm(`确定要删除客户 [${client.name}] 吗？`)) { await deleteClient(client.client_id); await loadData(); } }

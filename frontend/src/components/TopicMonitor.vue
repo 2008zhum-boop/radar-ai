@@ -8,7 +8,7 @@
         <!-- Global Tabs -->
         <div class="tm-tabs">
             <span :class="{active: globalView === 'dashboard'}" @click="globalView='dashboard'">仪表盘</span>
-            <span :class="{active: globalView === 'stream'}" @click="globalView='stream'">实时情报流</span>
+            <span :class="{active: globalView === 'stream'}" @click="globalView='stream'; fetchStream()">实时快报监控</span>
             <span :class="{active: globalView === 'report'}" @click="globalView='report'">报告中心</span>
         </div>
         <div class="tm-actions">
@@ -180,18 +180,20 @@
                  <input type="text" placeholder="全网实时搜索..." class="sf-search" />
              </div>
              <div class="stream-list">
-                 <!-- Reuse Stream Items for now (Global Context) -->
-                 <div v-for="(item, idx) in streamItems" :key="idx" class="stream-item">
+                 <!-- Real Flash Items -->
+                 <div v-if="loadingStream" class="loading-box">加载中...</div>
+                 <div v-else-if="streamItems.length === 0" class="empty-box">暂无快报数据</div>
+                 <div v-else v-for="(item, idx) in streamItems" :key="item.id || idx" class="stream-item">
                     <div class="si-left">
-                        <span class="si-time">{{ formatTime(new Date(Date.now() - idx * 600000)) }}</span>
-                        <span class="si-platform" :class="item.platform.toLowerCase()">{{ item.platform }}</span>
+                        <span class="si-time">{{ formatTime(item.publish_time || item.created_at) }}</span>
+                        <span class="si-platform news">财联社快报</span>
                     </div>
                     <div class="si-main">
-                        <div class="si-title">{{ item.title }} <span>(来源: {{item.platform === 'Weibo'?'热搜榜':'推荐流'}})</span></div>
-                        <div class="si-snippet">{{ item.content }}</div>
+                        <div class="si-title">{{ item.tmt_title || item.title }}</div>
+                        <div class="si-snippet full-text">{{ item.tmt_content || item.content }}</div>
                         <div class="si-meta">
-                           <span class="tag-sm">{{ idx%2===0?'科技':'娱乐' }}</span>
-                           <span>热度: {{ item.influence * 10 }}</span>
+                           <span class="tag-sm">AI改写</span>
+                           <span class="si-source" v-if="item.tmt_source">来源: {{ item.tmt_source }}</span>
                         </div>
                     </div>
                  </div>
@@ -570,7 +572,13 @@ const contentTab = ref('content')
 const showCreateModal = ref(false)
 const createMode = ref('quick')
 const currentView = ref('dashboard') // Detail View
-const globalView = ref('dashboard') // Global View
+const props = defineProps({
+  initialView: { type: String, default: 'dashboard' } 
+})
+
+// ...
+
+const globalView = ref(props.initialView) // Global View
 
 // Filters
 const filters = ref({
@@ -583,6 +591,7 @@ const filters = ref({
   heatMin: 0,
   heatMax: 100
 })
+const loadingStream = ref(false)
 
 // New Topic Form
 const newTopic = ref({
@@ -593,12 +602,24 @@ const newTopic = ref({
   tags: ''
 })
 
-// Mock Stream & Reports
-const streamItems = ref([
-    { platform: 'Weibo', title: '用户A转发了关于XX的讨论', content: '这个观点很有意思...', sentiment: 'neutral', influence: 85 },
-    { platform: 'Douyin', title: '用户B发布了相关视频', content: '实测视频来了，大家来看看...', sentiment: 'positive', influence: 92 },
-    { platform: 'News', title: '某媒体发布深度报道', content: '行业分析指出市场趋势正在改变...', sentiment: 'negative', influence: 78 }
-])
+// Stream Items (Flash News)
+const streamItems = ref([])
+
+const fetchStream = async () => {
+    loadingStream.value = true
+    try {
+        const token = localStorage.getItem('token')
+        // Fetch published flashes (AI rewritten)
+        const res = await axios.get(`${API_URL}/flash/list?status=published&limit=50`, {
+            headers: { Authorization: `Bearer ${token}` }
+        })
+        streamItems.value = res.data || []
+    } catch (e) {
+        console.error("Fetch stream error", e)
+    } finally {
+        loadingStream.value = false
+    }
+}
 
 const mockReports = ref([
     { id: 1, name: '2026-02-01 日报', type: 'Daily', time: '2026-02-02 08:00' },
@@ -745,6 +766,11 @@ const sentimentChartOption = computed(() => ({
 // Methods
 const fetchTopics = async () => {
   loading.value = true
+  // Fetch stream if global view is stream
+  if (globalView.value === 'stream') {
+      fetchStream()
+  }
+  
   try {
     const token = localStorage.getItem('token')
     const res = await axios.get(`${API_URL}/topics`, {

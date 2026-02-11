@@ -1,191 +1,136 @@
-"""
-AI 创作：通过 OpenRouter 调用大模型（如 Gemini）分析话题、生成选题策略和大纲。
-"""
 import os
 import json
 import re
+import time
 import requests
 from typing import Optional
 
-# ================= 配置区域 =================
-# 优先从环境变量读取，便于部署时替换
-OPENROUTER_API_KEY = os.getenv(
-    "OPENROUTER_API_KEY",
-    "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"
-)
-API_BASE = "https://openrouter.ai/api/v1/chat/completions"
-MODEL_NAME = "google/gemini-2.0-flash-lite-preview-02-05:free"
-# ===========================================
+# ================= 🚀 核心配置 =================
 
+# 1. SiliconFlow Key
+SILICON_KEY = "sk-xhlggbibvssprqgoadkdpxdnsbpzdeqfpkcrnhhnuohowrpd"
 
-def call_openrouter(prompt: str) -> Optional[str]:
-    """
-    通用函数：调用 OpenRouter API
-    """
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json",
-        "HTTP-Referer": "http://localhost:5173",
-        "X-Title": "SmartEdit"
-    }
+# 2. 模型选择
+SILICON_MODEL_MAIN = "Qwen/Qwen2.5-72B-Instruct" 
+SILICON_MODEL_BACKUP = "deepseek-ai/DeepSeek-V3"
+
+# 3. Google 配置
+GEMINI_API_KEY = "AIzaSyCIrIYeRTujYGAina6k67YKqldr1PiOx7Y"
+GEMINI_MODEL = "gemini-2.0-flash"
+
+# 4. 代理地址
+PROXY_URL = "socks5h://127.0.0.1:9091"
+
+# =============================================
+
+def get_proxies(force_proxy=False):
+    if force_proxy:
+        return { "http": PROXY_URL, "https": PROXY_URL }
+    else:
+        return { "http": None, "https": None }
+
+def call_silicon_raw(prompt, model_name):
+    if not SILICON_KEY: return None
+    url = "https://api.siliconflow.cn/v1/chat/completions"
+    headers = { "Authorization": f"Bearer {SILICON_KEY}", "Content-Type": "application/json" }
     data = {
-        "model": MODEL_NAME,
-        "messages": [
-            {
-                "role": "system",
-                "content": "你是钛媒体的资深主编，擅长商业分析和选题策划。请务必只返回合法的 JSON 格式数据，不要包含 Markdown 代码块标记（如 ```json）。"
-            },
-            {"role": "user", "content": prompt}
-        ],
+        "model": model_name,
+        "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.7,
-        "top_p": 0.9
+        "max_tokens": 1024
     }
-
     try:
-        response = requests.post(API_BASE, headers=headers, json=data, timeout=30)
-        if response.status_code == 200:
-            res_json = response.json()
-            if "choices" in res_json and len(res_json["choices"]) > 0:
-                content = res_json["choices"][0]["message"]["content"]
-                content = re.sub(r"^```json\s*", "", content)
-                content = re.sub(r"^```\s*", "", content)
-                content = re.sub(r"\s*```$", "", content)
-                return content.strip()
-            else:
-                print(f"API Response Empty: {res_json}")
-                return None
+        resp = requests.post(url, headers=headers, json=data, timeout=20, proxies=get_proxies(False))
+        if resp.status_code == 200:
+            return resp.json()['choices'][0]['message']['content']
+        elif resp.status_code == 402:
+            print(f"⚠️ {model_name} 余额不足 (402)，跳过...")
         else:
-            print(f"API Error: {response.status_code} - {response.text}")
-            return None
-    except Exception as e:
-        print(f"Request Failed: {e}")
-        return None
+            print(f"⚠️ SiliconFlow ({model_name}) Error: {resp.text[:100]}")
+    except Exception as e: 
+        print(f"⚠️ SF Network Error: {e}")
+    return None
 
+def call_gemini(prompt):
+    if not GEMINI_API_KEY: return None
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
+    headers = {"Content-Type": "application/json"}
+    data = { "contents": [{ "parts": [{"text": prompt}] }] }
+    try:
+        for i in range(2):
+            if i > 0: time.sleep(1)
+            resp = requests.post(url, headers=headers, json=data, timeout=30, proxies=get_proxies(True))
+            if resp.status_code == 200:
+                res = resp.json()
+                if "candidates" in res: return res["candidates"][0]["content"]["parts"][0]["text"].strip()
+    except: pass
+    return None
 
-def analyze_topic_deeply(topic: str, instruction: Optional[str] = None) -> dict:
-    """
-    真 AI：深度分析话题，返回选题策略（角度、标题、理由、大纲要点）。
-    支持用户指令 instruction 进行调整。
-    """
-    print(f"正在 AI 分析话题: {topic}, 指令: {instruction} ...")
+def call_ai(prompt):
+    res = call_silicon_raw(prompt, SILICON_MODEL_MAIN)
+    if res: return res
+    print(f"⚠️ 主模型失败，尝试备用...")
+    res = call_silicon_raw(prompt, SILICON_MODEL_BACKUP)
+    if res: return res
+    print("⚠️ SiliconFlow 全线失败，切换 Google Gemini...")
+    return call_gemini(prompt)
 
-    base_prompt = f"请针对话题“{topic}”，生成一份深度选题分析报告。"
-    if instruction:
-        base_prompt += f"\n用户对选题有特别要求（或基于之前的反馈）：{instruction}。请根据此要求调整你的分析和推荐策略。"
+def _safe_json(text: Optional[str]):
+    if not text: return None
+    try:
+        text = re.sub(r"^```json\s*", "", text)
+        text = re.sub(r"^```\s*", "", text)
+        text = re.sub(r"\s*```$", "", text)
+        match = re.search(r'(\{.*\}|\[.*\])', text, re.DOTALL)
+        if match: text = match.group(0)
+        return json.loads(text)
+    except: return None
 
+# ================= 业务逻辑 =================
+
+def generate_news_summary(title, content=""):
+    full_text = f"标题：{title}\n内容简述：{content[:1000]}"
+    
+    # 🔥 核心升级：增加 emotions 字段，要求返回 5 种具体情绪
     prompt = f"""
-    {base_prompt}
-    必须严格按照以下 JSON 格式返回，不要有多余废话：
+    你是一名资深舆情分析师。请分析这条新闻的选题价值，并精准判断其蕴含的情绪成分。
+    
+    请返回严格的 JSON 格式：
     {{
-        "topic": "{topic}",
-        "deep_analysis": {{
-            "event": "事件简述：用简练的语言概括核心事件脉络（100字以内）",
-            "industry": "行业透视：分析该事件对所在行业的影响、格局变化或潜在机会",
-            "thinking": "深度思辨：挖掘事件背后的底层逻辑、人性、资本博弈或社会意义",
-            "future": "未来展望：预测该事件或赛道的短期及长期发展趋势",
-            "conclusion": "结语：一句话总结核心洞察"
-        }},
-        "analysis": "（保留字段）简述舆论现状",
-        "strategies": [
-            {{
-                "angle": "切入角度名称(如：深度商业分析)",
-                "icon": "emoji图标",
-                "title": "拟定的爆款标题",
-                "reason": "推荐这个角度的理由(50字以内)",
-                "outline": ["一级小标题1", "一级小标题2", "一级小标题3", "一级小标题4"]
-            }},
-            {{
-                "angle": "切入角度名称(如：反直觉思考)",
-                "icon": "emoji图标",
-                "title": "拟定的爆款标题",
-                "reason": "推荐这个角度的理由",
-                "outline": ["一级小标题1", "一级小标题2", "一级小标题3", "一级小标题4"]
-            }},
-            {{
-                "angle": "切入角度名称(如：行业盘点)",
-                "icon": "emoji图标",
-                "title": "拟定的爆款标题",
-                "reason": "推荐这个角度的理由",
-                "outline": ["一级小标题1", "一级小标题2", "一级小标题3", "一级小标题4"]
-            }}
-        ]
+        "fact": "100字以内的深度摘要",
+        "score": 0-100 (选题价值),
+        "trend": "上升/平稳/下降",
+        "reason": "推荐理由",
+        "category": "从以下选择: [综合, 大模型, 科技, 财经, 金融, 汽车, 大健康, 新消费, 创投, 出海, 大公司, 国际]",
+        "tags": ["标签1"],
+        "sentiment": {{ "positive": 20, "neutral": 60, "negative": 20 }},
+        "emotions": {{
+            "anxiety": 10,   // 焦虑 (如裁员、制裁、亏损)
+            "anger": 5,      // 愤怒 (如丑闻、侵权、不公)
+            "sadness": 5,    // 悲伤 (如逝世、失败、灾难)
+            "excitement": 10,// 兴奋 (如突破、新高、发布)
+            "sarcasm": 0     // 嘲讽 (如吃瓜、反转、打脸)
+        }}
     }}
+    
+    注意：
+    1. sentiment 三项之和必须为 100。
+    2. emotions 的五项数值代表强度(0-100)，不需要加起来等于100，但要符合逻辑。若新闻很平淡，所有情绪值都应较低。
+    
+    新闻：
+    {full_text}
     """
+    
+    res = call_ai(prompt)
+    data = _safe_json(res)
+    
+    if data: return data
+    
+    return {}
 
-    json_str = call_openrouter(prompt)
-    if not json_str:
-        return _get_mock_data(topic, instruction)
-
-    try:
-        return json.loads(json_str)
-    except Exception as e:
-        print(f"JSON Parse Error: {e}")
-        return _get_mock_data(topic, instruction)
-
-
-def generate_full_outline(topic: str, angle: str) -> list:
-    """
-    真 AI：根据选定角度生成详细大纲。
-    返回列表，每项为 {"h1": "小标题", "text": "写作思路简述"}。
-    """
-    print(f"正在生成大纲: {topic} - {angle} ...")
-    prompt = f"""
-    请为话题“{topic}”写一份详细的文章大纲，切入角度是“{angle}”。
-    返回 JSON 格式：
-    [
-        {{"h1": "引言：(小标题内容)", "text": "简述引言部分的写作思路..."}},
-        {{"h1": "核心观点：(小标题内容)", "text": "阐述核心论点..."}},
-        {{"h1": "深度论证：(小标题内容)", "text": "列举数据或案例进行分析..."}},
-        {{"h1": "结论与展望", "text": "总结全文，给出预测..."}}
-    ]
-    """
-    json_str = call_openrouter(prompt)
-    if not json_str:
-        return [{"h1": "生成失败", "text": "请重试或检查网络"}]
-
-    try:
-        return json.loads(json_str)
-    except Exception:
-        return [{"h1": "格式解析错误", "text": "AI 返回的数据格式不正确"}]
-
-
-def _get_mock_data(topic: str, instruction: Optional[str] = None) -> dict:
-    """
-    兜底用的假数据（网络不通时使用）
-    """
-    suffix = f" (基于指令：{instruction})" if instruction else ""
-    return {
-        "topic": topic,
-        "analysis": f"AI 已检索全网关于“{topic}”的讨论（离线模式）。{suffix}",
-        "emotion": "负面偏多",
-        "deep_analysis": {
-            "event": f"关于“{topic}”的最新进展显示，相关讨论热度持续上升，网络声量在过去24小时内达到峰值。主要聚焦点在于核心利益相关方的回应及后续处理措施。",
-            "industry": "该事件暴露了行业在合规性与应急处理机制上的短板，预计将在短期内引发监管部门的关注，倒逼行业进行标准化整改。",
-            "thinking": "透过现象看本质，这不仅仅是单一事件，更反映了在流量经济下，公众情绪与事实真相之间的割裂。资本博弈在其中起到了推波助澜的作用。",
-            "future": "预计短期内仍将保持高热度，随着更多细节披露，舆论风向可能发生反转。长期来看，将催生新的行业规范。",
-            "conclusion": "综上所述，建议密切关注官方通报，避免盲目跟风，保持独立思考。"
-        },
-        "strategies": [
-            {
-                "angle": "深度商业分析",
-                "icon": "📊",
-                "title": f"《{topic}》背后的资本博弈{suffix}",
-                "reason": f"从产业链上下游出发，深扒利益分配机制。{suffix}",
-                "outline": ["一、现象级爆发的背后", "二、资本图谱全解析", "三、未来终局推演"]
-            },
-            {
-                "angle": "反直觉/逆向思维",
-                "icon": "🧠",
-                "title": f"为什么舆论此时引爆？{suffix}",
-                "reason": "在一片喧嚣中保持冷静，分析时间点背后的深意。",
-                "outline": ["一、偶然中的必然", "二、被忽视的关键变量", "三、结局预测"]
-            },
-            {
-                "angle": "定制化视角",
-                "icon": "🎯",
-                "title": f"从{instruction or '新视角'}看《{topic}》",
-                "reason": f"响应您的特殊要求：{instruction or '差异化'}",
-                "outline": ["一、核心切入点", "二、具体案例分析", "三、总结与升华"]
-            }
-        ]
-    }
+# 兼容接口
+def call_openrouter(prompt): return call_ai(prompt)
+def analyze_topic_deeply(topic): return _safe_json(call_ai(f"分析话题：{topic}，返回json")) or {}
+def generate_full_outline(topic, angle): return _safe_json(call_ai(f"写大纲：{topic}，角度{angle}，返回json")) or []
+def generate_smart_outline(title, angle, context=""): return _safe_json(call_ai(f"详细大纲：{title}，返回json")) or {}
+def generate_full_article(title, outline, context=""): return call_ai(f"写文章：{title}，大纲{outline}") or ""

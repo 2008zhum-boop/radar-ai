@@ -81,12 +81,14 @@
 
          <HotTable 
             v-else 
-            :list="hotList" 
+            :list="hotList"
+            :published-titles="publishedTitles"
+            @publish="handlePublish"
+            @write="handleWrite"
+            @add-topic="handleAddTopic"
             @analyze="handleAnalyze" 
             @click-item="handleClickItem"
             @dismiss="handleDismiss"
-            @instant-draft="handleInstantDraft"
-            @add-selection="handleAddSelection"
          />
       </div>
     </div>
@@ -95,6 +97,86 @@
     <div class="fab-assistant" @click="showChat = true">
         <span class="fab-icon">🤖</span>
         <span class="fab-text">灵感助手</span>
+    </div>
+
+    <!-- Publish Flash Modal -->
+    <div v-if="showFlashModal" class="modal-overlay" @click.self="closeFlashModal">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div class="modal-title">发布快报</div>
+          <button class="modal-close" @click="closeFlashModal">✕</button>
+        </div>
+        <div class="modal-body">
+          <label class="modal-label">标题</label>
+          <input v-model="flashTitle" class="modal-input" placeholder="快报标题" />
+          <label class="modal-label">快报正文</label>
+          <textarea v-model="flashBody" class="modal-textarea" rows="6" placeholder="快报正文"></textarea>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" @click="closeFlashModal">取消</button>
+          <button class="btn-primary" @click="publishFlash">发布</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add Topic Modal -->
+    <div v-if="showAddTopicModal" class="modal-overlay" @click.self="closeAddTopicModal">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div class="modal-title">加入选题</div>
+          <button class="modal-close" @click="closeAddTopicModal">✕</button>
+        </div>
+        <div class="modal-body">
+          <label class="modal-label">分配作者</label>
+          <input v-model="topicAuthor" class="modal-input" placeholder="请输入作者姓名" />
+          <label class="modal-label">建议完成日期</label>
+          <input v-model="topicDueDate" type="date" class="modal-input" />
+          <label class="modal-label">推荐选题切入点</label>
+          <textarea v-model="topicAngle" class="modal-textarea" rows="4" placeholder="请输入选题切入点"></textarea>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" @click="closeAddTopicModal">取消</button>
+          <button class="btn-primary" @click="confirmAddTopic">确认加入</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Topic Selection Modal -->
+    <div v-if="showTopicModal" class="modal-overlay" @click.self="closeTopicModal">
+      <div class="topic-modal-card">
+        <div class="modal-header">
+          <div class="modal-title">解析话题：{{ topicBaseTitle || '当前热点' }}</div>
+          <button class="modal-close" @click="closeTopicModal">✕</button>
+        </div>
+        <div class="modal-body">
+          <div v-if="topicLoading" class="topic-loading">AI 正在推荐选题...</div>
+          <div v-else class="topic-grid">
+            <div
+              v-for="(opt, idx) in topicOptions"
+              :key="idx"
+              class="topic-card"
+              @click="selectTopic(opt)"
+            >
+              <div class="topic-card-head">
+                <span class="topic-icon">{{ opt.icon || '✨' }}</span>
+                <span class="topic-angle">{{ opt.angle || '推荐角度' }}</span>
+              </div>
+              <div class="topic-title">{{ opt.title || topicBaseTitle }}</div>
+              <div class="topic-reason">{{ opt.reason || '' }}</div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn-secondary" @click="closeTopicModal">取消</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI Editor Modal -->
+    <div v-if="showEditor" class="editor-overlay">
+      <div class="editor-container">
+        <EditorView :initial-data="editorInitialData" @back="closeEditor" />
+      </div>
     </div>
 
     <!-- Assistant Modal -->
@@ -138,24 +220,17 @@
 
 
 
-    <!-- Report Loading Overlay -->
-    <div v-if="isGeneratingReport" class="loading-overlay">
-        <div class="spinner"></div>
-        <div class="loading-text">正在生成深度分析报告，请稍候...</div>
-    </div>
-
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, onUnmounted, inject, computed, watch, nextTick } from 'vue'
 import HotTable from './HotTable.vue'
-import { getHotList, analyzeTopic, getClients, addSelection } from '../services/api'
+import EditorView from './EditorView.vue'
+import { getHotList, analyzeTopic, getClients } from '../services/api'
 
-const emit = defineEmits(['start-instant-draft'])
-
-const categories = ["综合", "科技", "财经", "金融", "汽车", "大健康", "新消费", "创投", "宏观", "出海", "地方", "大公司", "大模型"]
-const sources = ["全部", "微博", "头条", "微信", "B站", "抖音", "百度", "GoogleAI"]
+const categories = ["综合", "科技", "财经", "金融", "汽车", "大健康", "新消费", "创投", "娱乐", "宏观", "出海", "地方", "国际", "大公司", "大模型" ]
+const sources = ["全部", "Google新闻", "百度热榜", "头条"]
 
 const currentCategory = ref("综合")
 const currentSource = ref("全部")
@@ -164,6 +239,23 @@ const sortBy = ref("heat")
 const hotList = ref([]) // processed
 const rawData = ref({}) // raw
 const loading = ref(false)
+const publishedTitles = ref([])
+
+const showFlashModal = ref(false)
+const flashTitle = ref('')
+const flashBody = ref('')
+const flashTarget = ref(null)
+const showTopicModal = ref(false)
+const topicLoading = ref(false)
+const topicOptions = ref([])
+const topicBaseTitle = ref('')
+const showEditor = ref(false)
+const editorInitialData = ref({ title: '', angle: '', topic: '' })
+const showAddTopicModal = ref(false)
+const topicAuthor = ref('')
+const topicDueDate = ref('')
+const topicAngle = ref('')
+const addTopicTarget = ref(null)
 
 // Data Maps
 const clientMap = ref({}) // keyword -> [ClientNames]
@@ -177,7 +269,7 @@ const focusItem = ref(null)
 
 // Chat State
 const chatMessages = ref([
-  { role: 'ai', text: '你好！我是你的创作灵感助手。今日热点很多，想写点什么？' }
+  { role: 'ai', text: '你好！我是你的创作灵感助手。今日热榜很多，想写点什么？' }
 ])
 const inputMessage = ref('')
 const isTyping = ref(false)
@@ -194,11 +286,32 @@ const matchedCount = computed(() => {
 })
 
 // Actions
-const load = async (silent = false) => {
+const HOTLIST_CACHE_TTL = 10 * 60 * 1000
+const getCacheKey = () => `hotlist_cache_${currentCategory.value}`
+
+const load = async (silent = false, force = false) => {
   if (!silent) loading.value = true
   try {
+    if (!force) {
+      const cacheKey = getCacheKey()
+      const cached = localStorage.getItem(cacheKey)
+      if (cached) {
+        const parsed = JSON.parse(cached)
+        if (parsed && parsed.updatedAt && (Date.now() - parsed.updatedAt) < HOTLIST_CACHE_TTL) {
+          rawData.value = parsed.data || {}
+          processData()
+          if (!silent) loading.value = false
+          return
+        }
+      }
+    }
     const res = await getHotList(currentCategory.value)
     rawData.value = res.data || {}
+    try {
+      localStorage.setItem(getCacheKey(), JSON.stringify({ updatedAt: Date.now(), data: rawData.value }))
+    } catch (e) {
+      console.warn('hotlist cache write failed', e)
+    }
     processData()
   } catch (e) {
     console.error('获取热搜失败', e)
@@ -367,62 +480,18 @@ const changeSort = (type) => {
     processData()
 }
 
-const refresh = () => load()
+const refresh = () => load(false, true)
 
-// Analysis State
-const isGeneratingReport = ref(false)
-
-const handleAnalyze = async (itemOrTitle) => {
-  if (isGeneratingReport.value) return // Prevent double click
-  isGeneratingReport.value = true
-  
-  // Resolve title and stats
-  let title = ''
-  let stats = {}
-  
-  if (typeof itemOrTitle === 'object') {
-      title = itemOrTitle.title
-      stats = {
-          heat: itemOrTitle.heat,
-          source: itemOrTitle.source, 
-          total_mentions: itemOrTitle.total_mentions || itemOrTitle.heat,
-          sentiment_distribution: itemOrTitle.sentiment_distribution, // Pass raw dist
-          emotion: itemOrTitle.sentiment_distribution 
-              ? `正面 ${itemOrTitle.sentiment_distribution.pos}% | 负面 ${itemOrTitle.sentiment_distribution.neg}%` 
-              : '中性',
-          high_risk_count: 0,
-          risks: [] 
-      }
-  } else {
-      title = itemOrTitle
-  }
-
+const handleAnalyze = async (title) => {
+  loading.value = true
   try {
     const result = await analyzeTopic(title)
-    
-    const combinedData = {
-        ...stats,
-        ...result, 
-        topic: title
-    }
-    
-    console.log("Combined Data for Report:", combinedData) // Debug Log
-
-    if (openReport) {
-        openReport(combinedData)
-        // Ensure overlay is closed immediately when report opens
-        isGeneratingReport.value = false 
-    } else {
-        console.error("openReport inject is missing!")
-        isGeneratingReport.value = false
-    }
+    if (openReport) openReport(result)
   } catch (e) {
-    console.error("Analysis Failed", e)
     alert("分析失败: " + e.message)
-    isGeneratingReport.value = false
+  } finally {
+    loading.value = false
   }
-  // Remove finally block to avoid double toggle or race conditions if openReport triggers things
-  // Or keep it but simple. 
 }
 
 const handleDismiss = (title) => {
@@ -430,21 +499,104 @@ const handleDismiss = (title) => {
     processData() // Re-render to remove it
 }
 
-const handleInstantDraft = (topic) => {
-    emit('start-instant-draft', topic)
+const handlePublish = (item) => {
+    if (!item) return
+    flashTarget.value = item
+    flashTitle.value = item.title || ''
+    flashBody.value = getSummaryText(item)
+    showFlashModal.value = true
 }
 
-const handleAddSelection = async (item) => {
-    try {
-        await addSelection({
-            topic: item.title,
-            source: 'Hotspot',
-            hotspot_id: item.url
-        })
-        alert("已添加到我的选题！")
-    } catch (e) {
-        alert("添加失败: " + (e.response?.data?.message || e.message))
+const closeFlashModal = () => {
+    showFlashModal.value = false
+    flashTarget.value = null
+    flashTitle.value = ''
+    flashBody.value = ''
+}
+
+const publishFlash = () => {
+    if (!flashTarget.value) return
+    const title = flashTarget.value.title || ''
+    if (title && !publishedTitles.value.includes(title)) {
+        publishedTitles.value.push(title)
     }
+    closeFlashModal()
+}
+
+const getSummaryText = (item) => {
+    if (!item) return ''
+    if (item.summary_text) return String(item.summary_text).trim()
+    if (item.summary && typeof item.summary === 'object' && item.summary.fact) {
+        return item.summary.fact.trim()
+    }
+    if (typeof item.summary === 'string' && item.summary.trim()) {
+        return item.summary.trim()
+    }
+    if (item.raw_summary_context) return String(item.raw_summary_context).trim()
+    return ''
+}
+
+const handleAddTopic = (item) => {
+    addTopicTarget.value = item || null
+    topicAuthor.value = ''
+    topicDueDate.value = ''
+    topicAngle.value = ''
+    showAddTopicModal.value = true
+}
+
+const closeAddTopicModal = () => {
+    showAddTopicModal.value = false
+    addTopicTarget.value = null
+}
+
+const confirmAddTopic = () => {
+    // 当前仅前端记录，后续可接入选题库接口
+    closeAddTopicModal()
+}
+
+const handleWrite = async (item) => {
+    if (!item) return
+    topicBaseTitle.value = item.title || ''
+    showTopicModal.value = true
+    topicLoading.value = true
+    topicOptions.value = []
+    try {
+        const res = await analyzeTopic(topicBaseTitle.value)
+        const data = res && (res.data || res.result || res)
+        const strategies = data && data.strategies ? data.strategies : []
+        topicOptions.value = (strategies || []).slice(0, 3)
+        if (topicOptions.value.length === 0) {
+            topicOptions.value = [
+                { angle: '深度商业观察', icon: '📊', title: topicBaseTitle.value, reason: '从行业与商业逻辑切入' },
+                { angle: '技术趋势解读', icon: '🧠', title: topicBaseTitle.value, reason: '强调技术演进与影响' },
+                { angle: '市场影响评估', icon: '🔥', title: topicBaseTitle.value, reason: '关注市场与用户侧变化' }
+            ]
+        }
+    } catch (e) {
+        topicOptions.value = [
+            { angle: '深度商业观察', icon: '📊', title: topicBaseTitle.value, reason: '从行业与商业逻辑切入' },
+            { angle: '技术趋势解读', icon: '🧠', title: topicBaseTitle.value, reason: '强调技术演进与影响' },
+            { angle: '市场影响评估', icon: '🔥', title: topicBaseTitle.value, reason: '关注市场与用户侧变化' }
+        ]
+    } finally {
+        topicLoading.value = false
+    }
+}
+
+const closeTopicModal = () => {
+    showTopicModal.value = false
+}
+
+const selectTopic = (opt) => {
+    const title = (opt && opt.title) ? opt.title : topicBaseTitle.value
+    const angle = (opt && opt.angle) ? opt.angle : '通用'
+    editorInitialData.value = { title, angle, topic: topicBaseTitle.value }
+    showTopicModal.value = false
+    showEditor.value = true
+}
+
+const closeEditor = () => {
+    showEditor.value = false
 }
 
 const handleClickItem = (item) => {
@@ -637,6 +789,181 @@ onUnmounted(() => {
     display: flex; align-items: center; gap: 8px;
     transition: transform 0.2s;
 }
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modal-card {
+  width: 520px;
+  max-width: 90vw;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 18px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.modal-title {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.modal-close {
+  border: none;
+  background: transparent;
+  font-size: 16px;
+  cursor: pointer;
+  color: #94a3b8;
+}
+
+.modal-body {
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.modal-label {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.modal-input,
+.modal-textarea {
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 14px;
+  color: #0f172a;
+  resize: vertical;
+}
+
+.modal-footer {
+  padding: 12px 18px 16px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.btn-secondary {
+  background: #f3f4f6;
+  color: #475569;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.btn-primary {
+  background: #2563eb;
+  color: #ffffff;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+/* Topic Modal */
+.topic-modal-card {
+  width: 720px;
+  max-width: 94vw;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+  overflow: hidden;
+}
+
+.topic-loading {
+  padding: 24px;
+  color: #64748b;
+}
+
+.topic-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.topic-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: #ffffff;
+}
+
+.topic-card:hover {
+  border-color: #2563eb;
+  box-shadow: 0 6px 18px rgba(37,99,235,0.12);
+}
+
+.topic-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.topic-icon {
+  font-size: 18px;
+}
+
+.topic-angle {
+  font-size: 12px;
+  color: #2563eb;
+  background: #eff6ff;
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-weight: 600;
+}
+
+.topic-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.4;
+  margin-bottom: 8px;
+}
+
+.topic-reason {
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+/* Editor Overlay */
+.editor-overlay {
+  position: fixed;
+  inset: 0;
+  background: #ffffff;
+  z-index: 110;
+}
+
+.editor-container {
+  height: 100%;
+}
+
+@media (max-width: 900px) {
+  .topic-grid { grid-template-columns: 1fr; }
+}
 .fab-assistant:hover { transform: scale(1.05); background: #1d4ed8; }
 .fab-icon { font-size: 20px; }
 .fab-text { font-size: 14px; font-weight: 600; }
@@ -704,15 +1031,6 @@ onUnmounted(() => {
 
 /* Batch Bar */
 
-
-/* Report Loading */
-.loading-overlay {
-    position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-    background: rgba(255,255,255,0.8); z-index: 999;
-    display: flex; flex-direction: column; justify-content: center; align-items: center;
-    backdrop-filter: blur(2px);
-}
-.loading-text { margin-top: 16px; font-weight: 600; color: #475569; }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 </style>

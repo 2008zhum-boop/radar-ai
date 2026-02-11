@@ -13,7 +13,7 @@ DB_FILE = "radar_data.db"
 # 1. 数据库初始化
 # ==========================================
 def init_monitor_db():
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(DB_FILE, timeout=30.0)
     c = conn.cursor()
     
     # 客户配置表
@@ -104,6 +104,18 @@ def init_monitor_db():
                   created_at REAL,
                   status INTEGER DEFAULT 1,
                   notes TEXT)''')
+
+    # === 3. 新增字段迁移 ===
+    try: c.execute("ALTER TABLE mentions ADD COLUMN event_title TEXT")
+    except: pass
+    try: c.execute("ALTER TABLE mentions ADD COLUMN primary_tag VARCHAR(50)")
+    except: pass
+    try: c.execute("ALTER TABLE mentions ADD COLUMN secondary_tag VARCHAR(50)")
+    except: pass
+    try: c.execute("ALTER TABLE mentions ADD COLUMN quality_score INTEGER DEFAULT 0")
+    except: pass
+    try: c.execute("ALTER TABLE mentions ADD COLUMN created_at REAL")
+    except: pass
         
     conn.commit()
     conn.close()
@@ -192,7 +204,7 @@ def analyze_risk(text, match_result, source_weight, sentiment_score):
 
 # [1] 处理爬虫数据 (main.py 需要这个!)
 def process_monitor_data(raw_items):
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(DB_FILE, timeout=30.0)
     c = conn.cursor()
     c.execute("SELECT client_id, monitor_logic, name FROM client_config WHERE status=1")
     clients = c.fetchall()
@@ -430,7 +442,7 @@ def get_monitor_stats(client_id=None):
 
 # [3] 保存客户配置
 def save_full_client_config(name, industry, status, logic_dict, client_id=None):
-    conn = sqlite3.connect(DB_FILE)
+    conn = sqlite3.connect(DB_FILE, timeout=20)
     c = conn.cursor()
     
     # Try to find existing client
@@ -615,71 +627,81 @@ def get_global_content_library(search_text="", client_id=None, source_filter=Non
     start_time = time.time() - time_seconds if time_range != "all" else 0
     
     # 基础查询
-    base_cols = "id, client_id, source, title, content_text, url, publish_time, sentiment_score, risk_level, clean_status, manual_category, manual_sentiment"
-    sql = f"SELECT {base_cols} FROM mentions WHERE publish_time > ?"
+    # Join with article_tags to get tags
+    # We use a subquery or direct join? Direct join with Group By might mess up pagination if not careful.
+    # Safe way: Select base items first (with limit), THEN fetch tags for them?
+    # OR: Join and Group By ID.
+    
+    # Let's use GROUP BY id to ensure unique items and agg tags
+    # Added new fields: event_title, quality_score, primary_tag, secondary_tag, created_at
+    base_cols = "m.id, m.client_id, m.source, m.title, m.content_text, m.url, m.publish_time, m.sentiment_score, m.risk_level, m.clean_status, m.manual_category, m.manual_sentiment, m.event_title, m.quality_score, m.primary_tag, m.secondary_tag, m.ai_fact, m.created_at"
+    
+    sql = f"""
+        SELECT {base_cols}, GROUP_CONCAT(t.name) as tag_names
+        FROM mentions m
+        LEFT JOIN article_tags at ON cast(m.id as text) = at.article_id
+        LEFT JOIN tags t ON at.tag_id = t.id
+        WHERE m.publish_time > ?
+    """
     params = [start_time]
     
     # Client ID 筛选
     if client_id:
-        sql += " AND client_id = ?"
+        sql += " AND m.client_id = ?"
         params.append(client_id)
 
     # 搜索条件（全文检索）
     if search_text:
-        sql += " AND (title LIKE ? OR content_text LIKE ?)"
+        sql += " AND (m.title LIKE ? OR m.content_text LIKE ?)"
         search_pattern = f"%{search_text}%"
         params.extend([search_pattern, search_pattern])
     
     # 来源筛选
     if source_filter and len(source_filter) > 0:
         placeholders = ",".join(["?" for _ in source_filter])
-        sql += f" AND source IN ({placeholders})"
+        sql += f" AND m.source IN ({placeholders})"
         params.extend(source_filter)
     
     # 情感筛选
     if sentiment_filter and len(sentiment_filter) > 0:
         if "positive" in sentiment_filter and "negative" in sentiment_filter and "neutral" in sentiment_filter:
-            pass  # 全选，无需筛选
+            pass
         else:
             sentiment_conditions = []
             if "positive" in sentiment_filter:
-                sentiment_conditions.append("sentiment_score > 0.3")
+                sentiment_conditions.append("m.sentiment_score > 0.3")
             if "negative" in sentiment_filter:
-                sentiment_conditions.append("sentiment_score < -0.1")
+                sentiment_conditions.append("m.sentiment_score < -0.1")
             if "neutral" in sentiment_filter:
-                sentiment_conditions.append("sentiment_score BETWEEN -0.1 AND 0.3")
+                sentiment_conditions.append("m.sentiment_score BETWEEN -0.1 AND 0.3")
             if sentiment_conditions:
                 sql += " AND (" + " OR ".join(sentiment_conditions) + ")"
     
     # 清洗状态筛选
     if clean_status_filter and len(clean_status_filter) > 0:
         placeholders = ",".join(["?" for _ in clean_status_filter])
-        sql += f" AND clean_status IN ({placeholders})"
+        sql += f" AND m.clean_status IN ({placeholders})"
         params.extend(clean_status_filter)
     else:
         # 默认不显示已废弃的
-        sql += " AND (clean_status != 'discarded' OR clean_status IS NULL)"
+        sql += " AND (m.clean_status != 'discarded' OR m.clean_status IS NULL)"
     
     # 不显示已归档的
-    sql += " AND is_archived = 0"
+    sql += " AND m.is_archived = 0"
     
-    # 不显示重复的 (只显示 is_duplicate=0)
-    sql += " AND is_duplicate = 0"
+    # 不显示重复的
+    sql += " AND m.is_duplicate = 0"
+    
+    # Group By ID to combine tags
+    sql += " GROUP BY m.id"
     
     # 排序和分页
-    sql += " ORDER BY publish_time DESC LIMIT ? OFFSET ?"
+    sql += " ORDER BY m.publish_time DESC LIMIT ? OFFSET ?"
     offset = (page - 1) * page_size
     params.extend([page_size, offset])
     
-    has_manual_tags = False
-    try:
-        sql_with_tags = sql.replace(f"SELECT {base_cols} ", "SELECT " + base_cols + ", manual_tags ")
-        c.execute(sql_with_tags, params)
-        rows = c.fetchall()
-        has_manual_tags = True
-    except sqlite3.OperationalError:
-        c.execute(sql, params)
-        rows = c.fetchall()
+    c.execute(sql, params)
+    rows = c.fetchall()
     
     items = []
     for row in rows:
@@ -688,23 +710,66 @@ def get_global_content_library(search_text="", client_id=None, source_filter=Non
         sentiment = row[7] if row[7] is not None else 0  # sentiment_score
         risk = row[8] if row[8] is not None else 0  # risk_level
         hotness_score = (risk * 30) + (weight * 0.3) + max(0, sentiment * 50)
-        tags_val = (row[12] or "") if has_manual_tags and len(row) > 12 else ""
+        
+        # tags_str is from GROUP_CONCAT(t.name) at row[12]
+        tags_val = row[12] if len(row) > 12 else ""
+        # If it's a comma separated string, split it for frontend array support if needed, or keep as string
+        # Frontend handles string or array: `item.tags`
+        # Let's return as string or array? Frontend code: `item.tags.slice(0,2).join(',')` implies array.
+        # But `detail.manual_tags` logic suggests it might be string. 
+        # GlobalContentLibrary.vue: `Array.isArray(item.tags) ? ...`
+        
+        if tags_val:
+            tags_list = tags_val.split(',')
+            # Deduplicate just in case
+            tags_list = list(set(tags_list))
+            tags_val = tags_list
+        else:
+            tags_val = []
+            
+        # Parse new fields
+        # row indices have shifted because we added columns to base_cols
+        # 0:id, 1:client, 2:source, 3:title (Article Title), 4:content, 5:url, 6:pub_time, 
+        # 7:sentiment, 8:risk, 9:clean, 10:man_cat, 11:man_sent, 
+        # 12:event_title, 13:quality, 14:p_tag, 15:s_tag, 16:ai_fact, 17:created_at
+        # 18: tag_names (GROUP_CONCAT)
+        
+        event_title = row[12] if row[12] else row[3] # Fallback to article title if no event title
+        quality = row[13] if row[13] else 0
+        p_tag = row[14]
+        s_tag = row[15]
+        summary = row[16] # ai_fact
+        ingest_time = row[17] if row[17] else row[6] # Fallback to publish_time
+
+        # Logic for tags if p_tag/s_tag are empty but tags_val exists
+        if not p_tag and len(tags_val) > 0: p_tag = tags_val[0]
+        if not s_tag and len(tags_val) > 1: s_tag = tags_val[1]
+        
         items.append({
             "id": row[0],
             "client_id": row[1],
             "source": row[2],
-            "title": row[3],
-            "content_preview": row[4][:150] if row[4] else "",
+            "article_title": row[3], # rename title -> article_title
+            "event_title": event_title,
+            "title": row[3], # Keep for compatibility
+            "summary": summary,
+            "content_text": row[4],
+            "content_preview": row[4][:100] if row[4] else "",
             "url": row[5],
             "publish_time": row[6],
+            "ingest_time": ingest_time,
+            "ingest_time_display": time.strftime("%m-%d %H:%M", time.localtime(ingest_time)),
             "time_display": time.strftime("%m-%d %H:%M", time.localtime(row[6])),
-            "sentiment_score": round(row[7], 2),
-            "sentiment_label": "负面" if row[8] >= 2 else ("正面" if row[8] == 1 else ("正面" if row[7] > 0.3 else ("负面" if row[7] < -0.1 else "中性"))),
-            "risk_level": row[8],
+            "sentiment_score": round(sentiment, 2),
+            "sentiment_label": "负面" if risk >= 2 else ("正面" if risk == 1 else ("正面" if sentiment > 0.3 else ("负面" if sentiment < -0.1 else "中性"))),
+            "risk_level": risk,
+            "quality_score": quality,
             "clean_status": row[9] or "uncleaned",
             "manual_category": row[10],
             "manual_sentiment": row[11],
             "category": row[10],
+            "primary_tag": p_tag,
+            "secondary_tag": s_tag,
             "tags": tags_val,
             "hotness": round(hotness_score, 0),
             "hotness_display": "🔥" * min(5, max(1, int(hotness_score / 1000))),
@@ -933,8 +998,10 @@ def get_mention_by_id(mention_id):
     }
 
 # [13c] 全量更新内容（标题、正文、摘要、分类、情感、标签）
+# [13c] 全量更新内容（标题、正文、摘要、分类、情感、标签、事件标题、质量）
 def update_content_full(mention_id, title=None, content_text=None, manual_category=None,
-                        manual_sentiment=None, ai_fact=None, manual_tags=None, updated_by="editor"):
+                        manual_sentiment=None, ai_fact=None, manual_tags=None, 
+                        event_title=None, quality_score=None, updated_by="editor"):
     """编辑保存时更新内容的所有可编辑字段"""
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
@@ -955,6 +1022,20 @@ def update_content_full(mention_id, title=None, content_text=None, manual_catego
     if ai_fact is not None:
         updates.append("ai_fact=?")
         params.append(ai_fact)
+    if event_title is not None:
+        try: 
+            c.execute("ALTER TABLE mentions ADD COLUMN event_title TEXT")
+        except: 
+            pass
+        updates.append("event_title=?")
+        params.append(event_title)
+    if quality_score is not None:
+        try: 
+            c.execute("ALTER TABLE mentions ADD COLUMN quality_score INTEGER DEFAULT 0")
+        except: 
+            pass
+        updates.append("quality_score=?")
+        params.append(quality_score)
     if manual_tags is not None:
         try:
             c.execute("ALTER TABLE mentions ADD COLUMN manual_tags TEXT")
@@ -962,6 +1043,18 @@ def update_content_full(mention_id, title=None, content_text=None, manual_catego
             pass
         updates.append("manual_tags=?")
         params.append(manual_tags)
+        
+        # Also update derived tags
+        try:
+            tags_list = manual_tags.split(',') if isinstance(manual_tags, str) else manual_tags
+            p_tag = tags_list[0] if len(tags_list) > 0 else ""
+            s_tag = tags_list[1] if len(tags_list) > 1 else ""
+            updates.append("primary_tag=?")
+            params.append(p_tag)
+            updates.append("secondary_tag=?")
+            params.append(s_tag)
+        except: pass
+
     if not updates:
         conn.close()
         return {"status": "error", "message": "未指定要更新的字段"}
