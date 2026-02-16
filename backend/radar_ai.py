@@ -8,7 +8,7 @@ from typing import Optional
 # ================= 🚀 核心配置 =================
 
 # 1. SiliconFlow Key
-#SILICON_KEY = "sk-xhlggbibvssprqgoadkdpxdnsbpzdeqfpkcrnhhnuohowrpd"
+# SILICON_KEY = "sk-xhlggbibvssprqgoadkdpxdnsbpzdeqfpkcrnhhnuohowrpd"
 
 # 2. 模型选择
 SILICON_MODEL_MAIN = "Qwen/Qwen2.5-72B-Instruct" 
